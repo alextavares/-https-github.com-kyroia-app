@@ -1,101 +1,105 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth/guards'
+import { handleRoute, DomainError } from '@/lib/http/errors'
+import { setNoStore } from '@/lib/cache/headers'
+import { z } from 'zod'
+import { validateWith } from '@/lib/validation/zod-helpers'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function GET() {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = NextResponse.json({ error: 'Unauthorized' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: auth.userId },
       select: {
         id: true,
         email: true,
         name: true,
         planType: true,
-        profession: true,
-        organization: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      throw new DomainError('NOT_FOUND', 'User not found')
     }
 
-    return NextResponse.json(user)
-  } catch (error) {
-    console.error('Error fetching profile:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch profile' },
-      { status: 500 }
-    )
-  }
+    const res = NextResponse.json(user)
+    setNoStore(res)
+    return res
+  })
 }
 
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+const patchSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  // Campos removidos do select por não existirem no schema atual
+  profession: z.string().min(1).max(120).optional(),
+  organization: z.string().min(1).max(120).optional(),
+}).refine(data => Object.keys(data).length > 0, {
+  message: 'At least one field must be provided',
+})
+
+export async function PATCH(request: Request) {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = NextResponse.json({ error: 'Unauthorized' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
-    const body = await request.json()
-    const { name, profession, organization } = body
+    const json = await request.json()
+    const input = await validateWith(patchSchema, json)
+    if (input instanceof Response) {
+      const res = input
+      setNoStore(res)
+      return res
+    }
 
     const updatedUser = await prisma.user.update({
-      where: { email: session.user.email },
+      where: { id: auth.userId },
       data: {
-        name,
-        profession,
-        organization
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        // Ignorados no schema atual
+        // ...(input.profession !== undefined ? { profession: input.profession } : {}),
+        // ...(input.organization !== undefined ? { organization: input.organization } : {}),
       },
       select: {
         id: true,
         email: true,
         name: true,
         planType: true,
-        profession: true,
-        organization: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     })
 
-    return NextResponse.json(updatedUser)
-  } catch (error) {
-    console.error('Error updating profile:', error)
-    return NextResponse.json(
-      { error: 'Failed to update profile' },
-      { status: 500 }
-    )
-  }
+    const res = NextResponse.json(updatedUser)
+    setNoStore(res)
+    return res
+  })
 }
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function DELETE() {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = NextResponse.json({ error: 'Unauthorized' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
-    // Delete user and all related data (cascade delete)
     await prisma.user.delete({
-      where: { email: session.user.email }
+      where: { id: auth.userId },
     })
 
-    return NextResponse.json({ message: 'Account deleted successfully' })
-  } catch (error) {
-    console.error('Error deleting account:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete account' },
-      { status: 500 }
-    )
-  }
+    const res = NextResponse.json({ message: 'Account deleted successfully' })
+    setNoStore(res)
+    return res
+  })
 }

@@ -118,7 +118,7 @@ export function DashboardSidebar() {
           <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
             <span className="text-xl font-bold text-purple-400">AI</span>
           </div>
-          <span className="text-xl font-semibold text-white">Inner AI</span>
+          <span className="text-xl font-semibold text-white">Kyroia</span>
         </Link>
       </SidebarHeader>
       

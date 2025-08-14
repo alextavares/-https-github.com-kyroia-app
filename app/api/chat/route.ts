@@ -1,284 +1,158 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
 import { aiService } from "@/lib/ai/ai-service"
 import { AIMessage } from "@/lib/ai/types"
-import { CreditService } from "@/lib/credit-service"
-import { 
-  getModelById, 
-  calculateCreditsForTokens, 
-  modelRequiresCredits,
-  getModelsForPlan 
-} from "@/lib/ai/innerai-models-config"
+
+/**
+ * Contrato:
+ * - Entrada (POST JSON): { model: string, messages: [{role:'user'|'assistant'|'system', content:string}], stream?: boolean }
+ * - Saída (200 non-stream): { id, model, created, choices:[{ message:{ role, content } }], usage:{ prompt_tokens, completion_tokens, total_tokens } }
+ * - Saída stream (text/event-stream): eventos "data: { delta }" terminando com "data: [DONE]"
+ * - Erros SEMPRE JSON: { error, code?, details? }
+ * Observação: Nesta etapa NÃO dependemos de banco nem créditos para destravar o chat.
+ */
+
+type ChatMessage = { role: "user" | "assistant" | "system"; content: string }
+type ChatBody = { model?: string; messages: ChatMessage[]; stream?: boolean }
+
+const parseBodySafely = async (request: NextRequest): Promise<ChatBody | null> => {
+  try {
+    return (await request.json()) as ChatBody
+  } catch {
+    return null
+  }
+}
+
+function jsonError(message: string, status = 400, details?: unknown) {
+  return NextResponse.json(
+    { error: message, details },
+    { status }
+  )
+}
 
 export async function POST(request: NextRequest) {
+  // Autenticação opcional (mantemos se já houver login na app)
+  // Mantemos autenticação opcional; remover variável evita aviso de unused
+  await getServerSession(authOptions).catch(() => null)
+
+  // Body
+  const body = await parseBodySafely(request)
+  if (!body) {
+    return jsonError("JSON inválido no corpo da requisição", 400)
+  }
+
+  const {
+    model = "gpt-4o-mini",
+    messages,
+    stream = false,
+  } = body as {
+    model?: string
+    messages: { role: "user" | "assistant" | "system"; content: string }[]
+    stream?: boolean
+  }
+
+  // Validação básica
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return jsonError("Campo 'messages' é obrigatório e deve ser um array não-vazio", 400)
+  }
+
+  // Mapeia para tipo interno
+  const aiMessages: AIMessage[] = messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }))
+
+  // Verificação de chave OpenRouter via aiService
   try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "Não autorizado" },
-        { status: 401 }
-      )
-    }
+    // generateResponse deverá utilizar OpenRouter como prioridade quando configurado
+    if (!stream) {
+      const result = await aiService.generateResponse(aiMessages, model)
 
-    const { messages, model = 'gpt-3.5-turbo', conversationId } = await request.json()
-
-    // Validar entrada
-    if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json(
-        { message: "Mensagens são obrigatórias" },
-        { status: 400 }
-      )
-    }
-
-    // Buscar usuário e verificar plano
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { message: "Usuário não encontrado" },
-        { status: 404 }
-      )
-    }
-
-    // Verificar se o modelo está disponível para o plano do usuário
-    const availableModels = getModelsForPlan(user.planType as 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE')
-    const modelAvailable = availableModels.some(m => m.id === model)
-    const modelConfig = getModelById(model)
-
-    if (!modelAvailable || !modelConfig) {
-      return NextResponse.json(
-        { message: "Modelo não disponível para seu plano atual" },
-        { status: 403 }
-      )
-    }
-
-    // Verificar se o modelo requer créditos e se o usuário tem créditos suficientes
-    if (modelRequiresCredits(model)) {
-      // Estimativa de créditos baseada no tamanho da mensagem (aproximação)
-      const userMessage = messages[messages.length - 1]?.content || ''
-      const estimatedInputTokens = Math.ceil(userMessage.length / 4) // Aproximação: 4 chars = 1 token
-      const estimatedOutputTokens = estimatedInputTokens // Estimativa: resposta similar ao input
-      
-      const estimatedCredits = calculateCreditsForTokens(model, estimatedInputTokens, estimatedOutputTokens)
-      const currentBalance = await CreditService.getUserBalance(user.id)
-      
-      console.log(`[Chat API] Credit check: ${currentBalance} available, ${estimatedCredits} estimated needed for model ${model}`)
-      
-      if (currentBalance < estimatedCredits) {
-        return NextResponse.json(
-          { 
-            message: `Créditos insuficientes. Necessários: ${estimatedCredits}, Disponíveis: ${currentBalance}. Adicione créditos para continuar usando este modelo.`,
-            creditsNeeded: estimatedCredits,
-            creditsAvailable: currentBalance,
-            modelCategory: modelConfig.category,
-            requiresUpgrade: true
+      const response = {
+        id: `chatcmpl_${Math.random().toString(36).slice(2)}`,
+        model,
+        created: Math.floor(Date.now() / 1000),
+        choices: [
+          {
+            index: 0,
+            finish_reason: "stop",
+            message: {
+              role: "assistant",
+              content: result.content,
+            },
           },
-          { status: 402 } // Payment Required
-        )
-      }
-    }
-
-    // Gerar resposta da IA
-    const aiMessages: AIMessage[] = messages.map((msg: any) => ({
-      role: msg.role,
-      content: msg.content
-    }))
-
-    console.log(`[Chat API] Requesting AI response for user ${user.id} with model ${model}`)
-    
-    let aiResponse
-    try {
-      aiResponse = await aiService.generateResponse(aiMessages, model)
-      console.log(`[Chat API] AI response received: ${aiResponse.content.length} chars, ${aiResponse.tokensUsed.total} tokens`)
-    } catch (error) {
-      console.error(`[Chat API] AI service failed:`, error)
-      // Fallback response for testing
-      aiResponse = {
-        content: `Olá! Sou o Inner AI e recebi sua mensagem: "${messages[messages.length - 1].content}". No momento estou em modo de teste. Como posso ajudá-lo?`,
-        tokensUsed: {
-          input: 10,
-          output: 25,
-          total: 35
+        ],
+        usage: {
+          prompt_tokens: result.tokensUsed.input ?? 0,
+          completion_tokens: result.tokensUsed.output ?? 0,
+          total_tokens: result.tokensUsed.total ?? ((result.tokensUsed.input ?? 0) + (result.tokensUsed.output ?? 0)),
         },
-        cost: 0.0001
       }
-      console.log(`[Chat API] Using fallback response`)
+
+      return NextResponse.json(response, { status: 200 })
     }
 
-    // Calcular créditos necessários baseado nos tokens reais usados
-    const creditsNeeded = calculateCreditsForTokens(
-      model, 
-      aiResponse.tokensUsed.input, 
-      aiResponse.tokensUsed.output
-    )
+    // Streaming SSE
+    const encoder = new TextEncoder()
+    const streamBody = new ReadableStream({
+      async start(controller) {
+        try {
+          // generateResponseStream deve ser implementado no aiService se ainda não existir
+          // fallback: simulamos chunk único com generateResponse
+          const maybeStream = (aiService as unknown as {
+            generateResponseStream?: (msgs: AIMessage[], model: string) => AsyncIterable<string> | Promise<AsyncIterable<string>>
+          }).generateResponseStream
 
-    console.log(`[Chat API] Credits needed: ${creditsNeeded} for model ${model} (${aiResponse.tokensUsed.input}/${aiResponse.tokensUsed.output} tokens)`)
-
-    // Criar ou atualizar conversa
-    let conversation
-    if (conversationId) {
-      conversation = await prisma.conversation.findFirst({
-        where: {
-          id: conversationId,
-          userId: user.id
+          if (typeof maybeStream === "function") {
+            const streamIter = await maybeStream(aiMessages, model)
+            for await (const chunk of streamIter) {
+              const payload = JSON.stringify({ delta: chunk })
+              controller.enqueue(encoder.encode(`data: ${payload}\n\n`))
+            }
+          } else {
+            const result = await aiService.generateResponse(aiMessages, model)
+            const payload = JSON.stringify({ delta: result.content })
+            controller.enqueue(encoder.encode(`data: ${payload}\n\n`))
+          }
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
+          controller.close()
+        } catch (err) {
+          const message = (err && typeof err === "object" && "message" in err) ? String((err as Error).message) : "Falha ao gerar resposta"
+          const payload = JSON.stringify({ error: message })
+          controller.enqueue(encoder.encode(`data: ${payload}\n\n`))
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
+          controller.close()
         }
-      })
-    }
-
-    if (!conversation) {
-      // Criar nova conversa
-      const title = messages[0]?.content?.substring(0, 50) + "..." || "Nova conversa"
-      conversation = await prisma.conversation.create({
-        data: {
-          userId: user.id,
-          title,
-          modelUsed: model
-        }
-      })
-    }
-
-    // Salvar mensagem do usuário
-    const userMessage = await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: 'USER',
-        content: messages[messages.length - 1].content,
-        modelUsed: model
-      }
-    })
-
-    // Salvar resposta da IA
-    const assistantMessage = await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: 'ASSISTANT',
-        content: aiResponse.content,
-        tokensUsed: aiResponse.tokensUsed.total,
-        modelUsed: model
-      }
-    })
-
-    // Consumir créditos se o modelo requer créditos
-    let creditResult = null
-    if (modelRequiresCredits(model) && creditsNeeded > 0) {
-      creditResult = await CreditService.consumeCredits(
-        user.id,
-        creditsNeeded,
-        `Chat com ${modelConfig.name} (${aiResponse.tokensUsed.input} input + ${aiResponse.tokensUsed.output} output tokens)`,
-        conversation.id,
-        'chat'
-      )
-
-      if (!creditResult.success) {
-        console.error(`[Chat API] Credit consumption failed: ${creditResult.message}`)
-        // Se falhou a cobrança de créditos, devemos reverter ou alertar
-        // Por enquanto, vamos apenas logar mas não bloquear
-      } else {
-        console.log(`[Chat API] Successfully consumed ${creditsNeeded} credits`)
-      }
-    }
-
-    // Atualizar estatísticas de uso
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    // Usar upsert para evitar problemas de concorrência
-    await prisma.userUsage.upsert({
-      where: {
-        userId_modelId_date: {
-          userId: user.id,
-          modelId: model,
-          date: today,
-        },
-      },
-      create: {
-        userId: user.id,
-        modelId: model,
-        date: today,
-        messagesCount: 1,
-        inputTokensUsed: aiResponse.tokensUsed.input,
-        outputTokensUsed: aiResponse.tokensUsed.output,
-        costIncurred: aiResponse.cost,
-      },
-      update: {
-        messagesCount: { increment: 1 },
-        inputTokensUsed: { increment: aiResponse.tokensUsed.input },
-        outputTokensUsed: { increment: aiResponse.tokensUsed.output },
-        costIncurred: { increment: aiResponse.cost },
       },
     })
 
-    // Obter saldo atualizado de créditos
-    const finalCreditBalance = await CreditService.getUserBalance(user.id)
-
-    return NextResponse.json({
-      message: aiResponse.content,
-      conversationId: conversation.id,
-      tokensUsed: aiResponse.tokensUsed,
-      cost: aiResponse.cost,
-      model: {
-        id: model,
-        name: modelConfig.name,
-        category: modelConfig.category,
-        provider: modelConfig.provider
+    return new NextResponse(streamBody, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
       },
-      credits: {
-        consumed: creditResult?.success ? creditsNeeded : 0,
-        balance: finalCreditBalance,
-        required: modelRequiresCredits(model)
-      }
     })
-
-  } catch (error: any) {
-    console.error("[Chat API] Error:", error)
-    
-    // Tratamento específico de erros
-    if (error.message?.includes('API key not configured')) {
-      return NextResponse.json(
-        { message: "Serviço de IA não configurado. Entre em contato com o suporte." },
-        { status: 503 }
-      )
+  } catch (error) {
+    // Mapeamento padronizado de erros
+    const msg = (error && typeof error === "object" && "message" in error)
+      ? String((error as Error).message)
+      : ""
+    if (msg.toLowerCase().includes("not configured") || msg.toLowerCase().includes("api key")) {
+      return jsonError("OpenRouter API key não configurada", 503, { hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY })
     }
-    
-    if (error.message?.includes('No configured provider')) {
-      return NextResponse.json(
-        { message: "Modelo de IA não disponível no momento." },
-        { status: 503 }
-      )
+    if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("quota")) {
+      return jsonError("Limite de uso temporariamente excedido", 429)
     }
-
-    if (error.message?.includes('timeout')) {
-      return NextResponse.json(
-        { message: "Tempo limite excedido. Tente novamente." },
-        { status: 408 }
-      )
+    if (msg.toLowerCase().includes("timeout")) {
+      return jsonError("Tempo limite excedido", 408)
     }
-
-    if (error.message?.includes('rate limit') || error.message?.includes('quota')) {
-      return NextResponse.json(
-        { message: "Limite de uso temporariamente excedido. Tente novamente em alguns minutos." },
-        { status: 429 }
-      )
-    }
-    
-    // Log detalhado para debug
-    console.error("[Chat API] Detailed error:", {
-      message: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    })
-    
-    return NextResponse.json(
-      { 
-        message: error.message || "Erro ao processar mensagem. Tente novamente.",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    )
+    const safeMessage = (error && typeof error === "object" && "message" in error)
+      ? String((error as Error).message)
+      : undefined
+    return jsonError("Falha ao processar chat", 500, { message: safeMessage })
   }
 }

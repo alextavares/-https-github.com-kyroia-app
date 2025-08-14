@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
           headers: {
             'Authorization': `Bearer ${openRouterKey}`,
             'HTTP-Referer': nextAuthUrl || 'https://seahorse-app-k5pag.ondigitalocean.app',
-            'X-Title': 'InnerAI Clone Test'
+            'X-Title': 'Kyroia Clone Test'
           }
         })
         
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
               'Authorization': `Bearer ${openRouterKey}`,
               'Content-Type': 'application/json',
               'HTTP-Referer': nextAuthUrl || 'https://seahorse-app-k5pag.ondigitalocean.app',
-              'X-Title': 'InnerAI Clone Test'
+              'X-Title': 'Kyroia Clone Test'
             },
             body: JSON.stringify({
               model: 'mistralai/mistral-7b-instruct',
@@ -80,14 +80,14 @@ export async function GET(request: NextRequest) {
         }
         
       } catch (error: any) {
-        result.tests.openRouterError = {
+        ;(result.tests as any).openRouterError = {
           message: error.message,
           name: error.name
         }
         result.status = 'error'
       }
     } else {
-      result.tests.openRouterAuth = {
+      ;(result.tests as any).openRouterAuth = {
         success: false,
         error: 'Chave OpenRouter não configurada ou inválida'
       }

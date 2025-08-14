@@ -1,12 +1,14 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
+    "types": ["@playwright/test", "node"],
+    "module": "esnext",
+    "target": "ES2020",
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "skipLibCheck": true,
+    "noEmit": true
   },
-  "include": [
-    "**/*.ts",
-    "**/*.json"
-  ]
+  "include": ["./**/*.ts", "./**/*.tsx", "./**/*.json"],
+  "exclude": ["../node_modules", "./e2e-output", "./**/*.d.ts"]
 }

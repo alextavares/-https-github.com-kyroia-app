@@ -276,6 +276,6 @@ export class AIModelManager {
   }
 }
 
-// Export types and schemas
-export type { AIModel, ModelSelection }
-export { ModelSelectionSchema }
+// Export types e schemas (evitar duplicações de export)
+// Já exportamos AIModel (interface) e ModelSelection (type) acima,
+// então não reexportamos novamente para evitar conflitos.

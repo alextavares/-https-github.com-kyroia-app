@@ -38,13 +38,11 @@ export async function GET(
       },
       select: {
         id: true,
-        name: true,
-        description: true,
+        title: true,
+        // description removido se não existir no schema
         type: true,
         content: true,
-        fileSize: true,
-        mimeType: true,
-        originalName: true,
+        // remover campos inexistentes no schema atual para SELECT
         createdAt: true,
         updatedAt: true,
       }

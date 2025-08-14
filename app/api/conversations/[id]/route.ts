@@ -1,154 +1,83 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { requireAuth } from "@/lib/auth/guards";
+import { handleRoute, Unauthorized, DomainError } from "@/lib/http/errors";
+import { setNoStore } from "@/lib/cache/headers";
+import { parseJson, validateWith } from "@/lib/validation/zod-helpers";
+import { ConversationsService } from "@/services/conversations";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "Não autorizado" },
-        { status: 401 }
-      )
-    }
+// App Router fornece params como objeto síncrono
+type RouteParams = { params: { id: string } };
 
-    // Verificar se a conversa pertence ao usuário
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: id,
-        userId: session.user.id
-      }
-    })
+const patchSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  isArchived: z.boolean().optional(),
+});
 
-    if (!conversation) {
-      return NextResponse.json(
-        { message: "Conversa não encontrada" },
-        { status: 404 }
-      )
-    }
+// GET /api/conversations/[id]
+export const GET = handleRoute(async (_req: Request, _ctx?: unknown) => {
+  // como handleRoute agora recebe (req) apenas, usamos assinatura compatível e extraímos id via URL
+  // Alternativa: Next.js passa (request: NextRequest, context: RouteParams) ao export; porém nosso wrapper não usa context.
+  // Portanto, recuperamos o id parseando a URL do request.
+  // Obs: quando chamado por Next, _req será NextRequest com URL /api/conversations/:id
+  const url = new URL((_req as NextRequest).url);
+  const segments = url.pathname.split("/");
+  const id = segments[segments.length - 1];
 
-    // Deletar a conversa (mensagens serão deletadas em cascata)
-    await prisma.conversation.delete({
-      where: {
-        id: id
-      }
-    })
-
-    return NextResponse.json({ message: "Conversa deletada com sucesso" })
-
-  } catch (error) {
-    console.error("Delete conversation error:", error)
-    return NextResponse.json(
-      { message: "Erro interno do servidor" },
-      { status: 500 }
-    )
+  const auth = await requireAuth();
+  if (!auth.ok) {
+    const res = Unauthorized();
+    setNoStore(res);
+    return res;
   }
-}
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "Não autorizado" },
-        { status: 401 }
-      )
-    }
+  const conversation = await ConversationsService.findById(auth.userId, id);
+  if (!conversation) throw new DomainError("NOT_FOUND", "Conversa não encontrada");
 
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: id,
-        userId: session.user.id
-      },
-      include: {
-        messages: {
-          orderBy: {
-            createdAt: 'asc'
-          }
-        }
-      }
-    })
+  return conversation;
+});
 
-    if (!conversation) {
-      return NextResponse.json(
-        { message: "Conversa não encontrada" },
-        { status: 404 }
-      )
-    }
+// PATCH /api/conversations/[id]
+export const PATCH = handleRoute(async (req: Request) => {
+  const url = new URL((req as NextRequest).url);
+  const segments = url.pathname.split("/");
+  const id = segments[segments.length - 1];
 
-    return NextResponse.json(conversation)
-
-  } catch (error) {
-    console.error("Get conversation error:", error)
-    return NextResponse.json(
-      { message: "Erro interno do servidor" },
-      { status: 500 }
-    )
+  const auth = await requireAuth();
+  if (!auth.ok) {
+    const res = Unauthorized();
+    setNoStore(res);
+    return res;
   }
-}
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "Não autorizado" },
-        { status: 401 }
-      )
-    }
-
-    const body = await request.json()
-    const { title, isArchived } = body
-
-    // Verificar se a conversa pertence ao usuário
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: id,
-        userId: session.user.id
-      }
-    })
-
-    if (!conversation) {
-      return NextResponse.json(
-        { message: "Conversa não encontrada" },
-        { status: 404 }
-      )
-    }
-
-    // Atualizar a conversa
-    const updatedConversation = await prisma.conversation.update({
-      where: {
-        id: id
-      },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(isArchived !== undefined && { isArchived })
-      }
-    })
-
-    return NextResponse.json({ conversation: updatedConversation })
-
-  } catch (error) {
-    console.error("Update conversation error:", error)
-    return NextResponse.json(
-      { message: "Erro interno do servidor" },
-      { status: 500 }
-    )
+  const json = await parseJson(req as NextRequest);
+  const parsed = await validateWith(patchSchema, json);
+  if (parsed instanceof Response) {
+    setNoStore(parsed);
+    return parsed;
   }
-}
+
+  const updated = await ConversationsService.update(auth.userId, id, parsed);
+  if (!updated) throw new DomainError("NOT_FOUND", "Conversa não encontrada");
+
+  return { conversation: updated };
+});
+
+// DELETE /api/conversations/[id]
+export const DELETE = handleRoute(async (req: Request) => {
+  const url = new URL((req as NextRequest).url);
+  const segments = url.pathname.split("/");
+  const id = segments[segments.length - 1];
+
+  const auth = await requireAuth();
+  if (!auth.ok) {
+    const res = Unauthorized();
+    setNoStore(res);
+    return res;
+  }
+
+  const removed = await ConversationsService.remove(auth.userId, id);
+  if (!removed) throw new DomainError("NOT_FOUND", "Conversa não encontrada");
+
+  return new Response(null, { status: 204 });
+});

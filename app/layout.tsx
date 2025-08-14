@@ -11,8 +11,8 @@ import { ThemeProvider } from "@/contexts/theme-context";
 // });
 
 export const metadata: Metadata = {
-  title: "Inner AI Clone",
-  description: "Clone da plataforma Inner AI com múltiplos provedores de IA",
+  title: "Kyroia",
+  description: "Clone da plataforma Kyroia com múltiplos provedores de IA",
 };
 
 export default function RootLayout({

@@ -44,6 +44,9 @@ services:
       - key: MERCADOPAGO_WEBHOOK_SECRET
         type: SECRET
         value: ${MERCADOPAGO_WEBHOOK_SECRET}
+      - key: WEBHOOK_WORKER_TOKEN
+        type: SECRET
+        value: ${WEBHOOK_WORKER_TOKEN}
       - key: STRIPE_SECRET_KEY
         type: SECRET
         value: ${STRIPE_SECRET_KEY}
@@ -58,6 +61,23 @@ services:
       - key: PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING
         value: "1"
         scope: BUILD_TIME
+  - name: webhook-worker
+    run_command: node scripts/cron/webhook-worker.js
+    environment_slug: node-js
+    instance_size_slug: basic-xxs
+    github:
+      repo: ${GITHUB_REPO}
+      branch: main
+      deploy_on_push: true
+    http_port: 0
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        value: ${APP_URL}
+      - key: WEBHOOK_WORKER_TOKEN
+        type: SECRET
+        value: ${WEBHOOK_WORKER_TOKEN}
 
 databases:
   - name: innerai-db

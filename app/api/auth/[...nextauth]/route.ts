@@ -1,6 +1,6 @@
-import NextAuth from "next-auth"
-import { authOptions } from "@/lib/auth-simple"
+import NextAuth from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-const handler = NextAuth(authOptions)
-
-export { handler as GET, handler as POST }
+// Fonte única de verdade: lib/auth.ts (providers, callbacks, pages, secret, etc.)
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };

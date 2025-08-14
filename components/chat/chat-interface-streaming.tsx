@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useSession } from "next-auth/react"
 import TemplateSelector from "./template-selector"
+import { getModelsForPlan, MODEL_CATEGORIES } from "@/lib/ai/innerai-models-config"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface Message {
   id: string
@@ -36,6 +38,9 @@ export default function ChatInterfaceStreaming({
   const [showExportMenu, setShowExportMenu] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { data: session } = useSession()
+  const [planType, setPlanType] = useState<'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'>('FREE')
+  const [loadingPlan, setLoadingPlan] = useState<boolean>(false)
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; category: 'fast' | 'advanced' | 'reasoning' }>>([])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -54,6 +59,66 @@ export default function ChatInterfaceStreaming({
     }
   }, [conversationId])
 
+  // Load user plan to gate advanced models
+  useEffect(() => {
+    const loadPlan = async () => {
+      if (!session?.user) return
+      setLoadingPlan(true)
+      try {
+        const res = await fetch('/api/subscription', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          const pt = (data?.planType || 'FREE') as typeof planType
+          setPlanType(pt)
+        }
+      } catch {}
+      finally {
+        setLoadingPlan(false)
+      }
+    }
+    loadPlan()
+  }, [session])
+
+  // Update available models when plan changes
+  useEffect(() => {
+    try {
+      const models = getModelsForPlan(planType).map(m => ({ id: m.id, name: m.name, category: m.category as 'fast' | 'advanced' | 'reasoning' }))
+      setAvailableModels(models)
+    } catch (e) {
+      setAvailableModels([])
+    }
+  }, [planType])
+
+  // Ensure selected model is valid for current plan
+  useEffect(() => {
+    if (!availableModels || availableModels.length === 0) return
+    const exists = availableModels.some(m => m.id === model)
+    if (!exists) {
+      onModelChange?.(availableModels[0].id)
+    }
+  }, [availableModels])
+
+  // Persist and restore selection per plan in localStorage
+  useEffect(() => {
+    try {
+      const key = `selectedModel:${planType}`
+      const stored = localStorage.getItem(key)
+      if (stored && availableModels.some(m => m.id === stored)) {
+        onModelChange?.(stored)
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planType, availableModels.length])
+
+  useEffect(() => {
+    try {
+      const key = `selectedModel:${planType}`
+      if (model) localStorage.setItem(key, model)
+    } catch {}
+  }, [model, planType])
+
+  const isAdvancedModel = (m: string) => availableModels.find(x => x.id === m)?.category === 'advanced' || false
+
   const loadConversationMessages = async () => {
     if (!conversationId) return
     
@@ -62,12 +127,13 @@ export default function ChatInterfaceStreaming({
       const response = await fetch(`/api/conversations/${conversationId}`)
       if (response.ok) {
         const data = await response.json()
-        const loadedMessages: Message[] = data.conversation.messages.map((msg: any) => ({
-          id: msg.id,
-          role: msg.role.toLowerCase() as 'user' | 'assistant',
-          content: msg.content,
-          timestamp: new Date(msg.createdAt)
-        }))
+          const loadedMessages: Message[] = data.conversation.messages.map((msg: any) => ({
+            id: msg.id,
+            role: msg.role.toLowerCase() as 'user' | 'assistant',
+            content: msg.content,
+            // Evitar mismatch de hidratação: armazena string e converte apenas no client render
+            timestamp: new Date(msg.createdAt)
+          }))
         setMessages(loadedMessages)
       }
     } catch (error) {
@@ -80,6 +146,12 @@ export default function ChatInterfaceStreaming({
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return
+
+    // Gate: block advanced models for FREE plan with friendly message
+    if (planType === 'FREE' && isAdvancedModel(model)) {
+      setError('Este modelo requer um plano LITE ou PRO. Faça upgrade para usar modelos avançados.')
+      return
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -94,7 +166,7 @@ export default function ChatInterfaceStreaming({
     setError("")
 
     // Add placeholder for assistant message
-    const assistantMessageId = (Date.now() + 1).toString()
+      const assistantMessageId = String(Date.now() + 1)
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: 'assistant',
@@ -105,10 +177,13 @@ export default function ChatInterfaceStreaming({
     setMessages(prev => [...prev, assistantMessage])
 
     try {
+      let showCostPref = false
+      try { showCostPref = localStorage.getItem('showResponseCost') === 'true' } catch {}
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-show-cost": showCostPref ? "true" : "false",
         },
         body: JSON.stringify({
           messages: [...messages, userMessage].map(msg => ({
@@ -268,20 +343,46 @@ export default function ChatInterfaceStreaming({
               </div>
             )}
           </div>
-          <select
-            value={model}
-            onChange={(e) => onModelChange(e.target.value)}
-            className="text-sm border rounded px-2 py-1 bg-background"
-            disabled={loading}
-          >
-            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-            {session?.user && (
-              <>
-                <option value="gpt-4">GPT-4</option>
-                <option value="gpt-4-turbo">GPT-4 Turbo</option>
-              </>
+          <div className="flex items-center gap-2">
+            <select
+              value={model}
+              onChange={(e) => onModelChange?.(e.target.value)}
+              className="text-sm border rounded px-2 py-1 bg-background"
+              disabled={loading}
+            >
+              {(['fast','advanced','reasoning'] as const).map(cat => {
+                const label = (MODEL_CATEGORIES as any)[cat] || cat
+                const models = availableModels.filter(m => m.category === cat)
+                if (models.length === 0) return null
+                return (
+                  <optgroup key={cat} label={label}>
+                    {models.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </optgroup>
+                )
+              })}
+            </select>
+            {planType === 'FREE' && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => (window.location.href = '/pricing')}
+                      disabled={loadingPlan}
+                    >
+                      {loadingPlan ? '...' : 'Upgrade'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Desbloqueie modelos avançados (GPT-4, Claude) com qualidade e contexto maiores.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
-          </select>
+          </div>
         </div>
       )}
 
@@ -337,7 +438,7 @@ export default function ChatInterfaceStreaming({
       {/* Input Area */}
       <div className="border-t border-border p-4">
         <div className="flex items-center space-x-2 mb-2">
-          <span className="text-sm text-muted-foreground">Pergunte para Inner AI</span>
+          <span className="text-sm text-muted-foreground">Pergunte para Kyroia</span>
           <Button 
             variant="ghost" 
             size="sm" 

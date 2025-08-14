@@ -1,105 +1,111 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { handleRoute, Unauthorized, NotFound } from '@/lib/http/errors'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+/**
+ * Lógica de Assinaturas compatível com o client atual.
+ * Observado nos tipos gerados: User não expõe 'subscriptions' em select/include
+ * e não há delegate prisma.subscription tipado. Porém o schema possui Subscription.
+ * Para compatibilidade, consultamos Subscription diretamente por userId.
+ */
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: {
-        subscriptions: {
-          where: {
-            status: 'ACTIVE'
-          },
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 1
-        }
-      }
-    })
+type ActiveSubDTO = {
+  id: string
+  userId: string
+  status: string
+  plan: string | null
+  currentPeriodStart: Date | null
+  currentPeriodEnd: Date | null
+  createdAt: Date
+  updatedAt: Date
+} | null
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const activeSubscription = user.subscriptions[0]
-
-    return NextResponse.json({
-      planType: user.planType,
-      subscription: activeSubscription || null
-    })
-  } catch (error) {
-    console.error('Error fetching subscription:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch subscription' },
-      { status: 500 }
-    )
+async function findActiveSubscription(userId: string): Promise<ActiveSubDTO> {
+  // Acessar via $queryRaw como fallback para evitar dependência de delegate gerado
+  // SQLite: tabela "Subscription" com colunas conforme schema.
+  type Row = {
+    id: string
+    userId: string
+    status: string
+    plan: string | null
+    currentPeriodStart: string | null
+    currentPeriodEnd: string | null
+    createdAt: string | null
+    updatedAt: string | null
+  }
+  const rows = await prisma.$queryRaw<Row[]>`
+    SELECT id, userId, status, plan, currentPeriodStart, currentPeriodEnd, createdAt, updatedAt
+    FROM Subscription
+    WHERE userId = ${userId} AND status = 'ACTIVE'
+    ORDER BY datetime(createdAt) DESC
+    LIMIT 1
+  `
+  if (!rows || rows.length === 0) return null
+  const r = rows[0]
+  return {
+    id: String(r.id),
+    userId: String(r.userId),
+    status: String(r.status),
+    plan: r.plan !== null ? String(r.plan) : null,
+    currentPeriodStart: r.currentPeriodStart ? new Date(r.currentPeriodStart) : null,
+    currentPeriodEnd: r.currentPeriodEnd ? new Date(r.currentPeriodEnd) : null,
+    createdAt: r.createdAt ? new Date(r.createdAt) : new Date(),
+    updatedAt: r.updatedAt ? new Date(r.updatedAt) : new Date(),
   }
 }
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const GET = handleRoute(async () => {
+  const auth = await requireAuth()
+  if (!auth.ok) return Unauthorized()
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+  })
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+  if (!user) {
+    return NotFound('User not found')
+  }
 
-    // Get active subscription
-    const activeSubscription = await prisma.subscription.findFirst({
-      where: {
-        userId: user.id,
-        status: 'ACTIVE'
-      }
-    })
+  const active = await findActiveSubscription(user.id)
+  const res = NextResponse.json({
+    planType: user.planType,
+    subscription: active,
+  })
+  setNoStore(res)
+  return res
+})
 
-    if (!activeSubscription) {
-      return NextResponse.json({ error: 'No active subscription found' }, { status: 404 })
-    }
+export const DELETE = handleRoute(async () => {
+  const auth = await requireAuth()
+  if (!auth.ok) return Unauthorized()
 
-    // In production, cancel Stripe subscription
-    // await stripe.subscriptions.cancel(activeSubscription.stripeSubscriptionId)
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+  })
+  if (!user) return NotFound('User not found')
 
-    // For development, update local database
-    await prisma.subscription.update({
-      where: { id: activeSubscription.id },
-      data: { 
-        status: 'CANCELLED',
-        expiresAt: new Date() // Immediate cancellation for demo
-      }
-    })
+  const active = await findActiveSubscription(user.id)
+  if (!active) {
+    const res404 = NextResponse.json({ error: 'No active subscription found' }, { status: 404 })
+    setNoStore(res404)
+    return res404
+  }
 
-    // Downgrade user to FREE
-    await prisma.user.update({
+  // Executar cancelamento via SQL direto para evitar falta de delegate subscription
+  await prisma.$transaction([
+    prisma.$executeRawUnsafe(
+      `UPDATE Subscription SET status = 'CANCELED', updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+      active.id
+    ),
+    prisma.user.update({
       where: { id: user.id },
-      data: { planType: 'FREE' }
-    })
+      data: { planType: 'FREE' },
+    }),
+  ])
 
-    return NextResponse.json({ 
-      message: 'Subscription cancelled successfully',
-      planType: 'FREE'
-    })
-  } catch (error) {
-    console.error('Error cancelling subscription:', error)
-    return NextResponse.json(
-      { error: 'Failed to cancel subscription' },
-      { status: 500 }
-    )
-  }
-}
+  const res = NextResponse.json({ ok: true })
+  setNoStore(res)
+  return res
+})

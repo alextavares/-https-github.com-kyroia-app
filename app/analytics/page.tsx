@@ -94,7 +94,7 @@ export default function Analytics() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Analytics</h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Acompanhe seu uso da plataforma Inner AI
+          Acompanhe seu uso da plataforma Kyroia
         </p>
       </div>
 

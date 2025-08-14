@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log("Request body:", { ...body, password: "[HIDDEN]" })
     
-    const { name, email, password, profession, organization } = body
+    const { name, email, password } = body
 
     // Validar dados
     if (!name || !email || !password) {
@@ -41,15 +41,16 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         email,
-        passwordHash,
-        profession,
-        organization,
+        // Nosso schema usa 'password' (String?) e 'creditBalance' (Int) em vez de 'passwordHash'/'credits'
+        password: passwordHash,
         planType: "FREE", // Plano inicial gratuito
+        onboardingCompleted: true,
       }
     })
 
     // Retornar dados do usuário (sem senha)
-    const { passwordHash: _password, ...userWithoutPassword } = user
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _ignored, ...userWithoutPassword } = user
 
     return NextResponse.json(
       { message: "Usuário criado com sucesso", user: userWithoutPassword },

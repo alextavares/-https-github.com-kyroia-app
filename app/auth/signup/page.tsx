@@ -121,7 +121,7 @@ export default function SignUp() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl text-center">Criar sua conta</CardTitle>
           <CardDescription className="text-center">
-            Junte-se ao InnerAI e comece sua jornada
+            Junte-se ao Kyroia e comece sua jornada
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

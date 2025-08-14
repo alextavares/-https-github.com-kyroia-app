@@ -47,7 +47,7 @@ export class OpenRouterProvider implements AIProvider {
     throw lastError || new Error('All retries failed')
   }
 
-  // Mapa EXATO dos modelos do InnerAI original para OpenRouter
+  // Mapa EXATO dos modelos do Kyroia original para OpenRouter
   private modelMap: Record<string, string> = {
     // ===== MODELOS RÁPIDOS (Fast Models) =====
     'llama-4-scout': 'meta-llama/llama-3.2-3b-instruct', // Fallback temporário
@@ -396,7 +396,7 @@ export class OpenRouterProvider implements AIProvider {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
             'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-            'X-Title': 'InnerAI Clone'
+            'X-Title': 'Kyroia Clone'
           },
           body: JSON.stringify({
             model: openRouterModel,
@@ -481,7 +481,7 @@ export class OpenRouterProvider implements AIProvider {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-          'X-Title': 'InnerAI Clone'
+          'X-Title': 'Kyroia Clone'
         },
         body: JSON.stringify({
           model: openRouterModel,
@@ -612,7 +612,7 @@ export class OpenRouterProvider implements AIProvider {
   }
 
   getAvailableModels(): AIModel[] {
-    // Os modelos agora são gerenciados pela configuração centralizada do InnerAI
+    // Os modelos agora são gerenciados pela configuração centralizada do Kyroia
     // Esta função é mantida para compatibilidade, mas não é mais usada
     return []
   }

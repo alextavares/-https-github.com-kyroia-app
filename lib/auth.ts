@@ -2,6 +2,11 @@ import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
 import AzureADProvider from "next-auth/providers/azure-ad"
+<<<<<<< HEAD
+=======
+import AppleProvider from "next-auth/providers/apple"
+/* eslint-disable @typescript-eslint/no-unused-vars */
+>>>>>>> kyroia
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
@@ -53,13 +58,14 @@ export const authOptions: NextAuthOptions = {
             }
           })
 
-          if (!user || !user.passwordHash) {
+          // Nosso schema armazena o hash em `password` (String?)
+          if (!user || !user.password) {
             return null
           }
 
           const isPasswordValid = await bcrypt.compare(
             credentials.password,
-            user.passwordHash
+            user.password
           )
 
           if (!isPasswordValid) {
@@ -77,6 +83,7 @@ export const authOptions: NextAuthOptions = {
         }
       }
     })
+<<<<<<< HEAD
   ],
   session: {
     strategy: "jwt",
@@ -138,6 +145,34 @@ export const authOptions: NextAuthOptions = {
         secure: process.env.NODE_ENV === "production"
       }
     }
+=======
+)
+
+// Removido adapter de banco temporariamente para usar JWT-only e destravar login social
+// Mantemos a função comentada como referência para quando reativarmos o PrismaAdapter.
+// const customPrismaAdapter = {
+//   ...PrismaAdapter(prisma),
+//   async createUser(user: any) {
+//     const { image, emailVerified, ...userData } = user
+//     return await prisma.user.create({
+//       data: {
+//         name: userData.name,
+//         email: userData.email,
+//         profileImage: image, // Map image to profileImage
+//         // Remove emailVerified as it's not in our schema
+//       },
+//     })
+//   },
+// }
+
+export const authOptions: NextAuthOptions = {
+  // adapter: customPrismaAdapter, // desabilitado temporariamente (JWT-only)
+  providers,
+  session: {
+    strategy: "jwt", // usar JWT para liberar login sem dependência de tabelas NextAuth
+    maxAge: 7 * 24 * 60 * 60, // 7 dias
+    updateAge: 24 * 60 * 60, // 24 horas
+>>>>>>> kyroia
   },
   pages: {
     signIn: "/auth/signin",
@@ -183,18 +218,41 @@ export const authOptions: NextAuthOptions = {
     
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id || token.sub!
-        session.user.email = token.email!
-        session.user.name = token.name!
+        type JwtShape = {
+          sub?: string
+          id?: string
+          email?: string
+          name?: string | null
+          picture?: string | null
+        }
+        const t = token as unknown as JwtShape
+        const safeUser: { id: string; email: string; name: string | null; image: string | null } = {
+          id: t.sub || t.id || session.user?.id || "",
+          email: t.email || session.user?.email || "",
+          name: (t.name ?? session.user?.name) ?? null,
+          image: (t.picture ?? session.user?.image) ?? null,
+        }
+        session.user = { ...(session.user || {}), ...safeUser }
       }
       return session
     },
+<<<<<<< HEAD
     
     async jwt({ token, user, account }) {
+=======
+    async jwt({ token, user, profile }) {
+>>>>>>> kyroia
       if (user) {
-        token.id = user.id
-        token.email = user.email
-        token.name = user.name
+        const u = user as { id?: string; email?: string; name?: string | null }
+        ;(token as Record<string, unknown>).id = u.id
+        ;(token as Record<string, unknown>).email = u.email
+        ;(token as Record<string, unknown>).name = u.name
+      }
+      if (profile && typeof profile === "object") {
+        const p = profile as { picture?: string | null }
+        if (p.picture) {
+          ;(token as Record<string, unknown>).picture = p.picture
+        }
       }
 
       // Para OAuth, buscar dados atualizados do usuário
@@ -214,12 +272,29 @@ export const authOptions: NextAuthOptions = {
       
       return token
     },
+<<<<<<< HEAD
     
     async redirect({ url, baseUrl }) {
       // Redirecionar para página de migração se houver sessão anônima
       if (url.includes("migrate=true")) {
         return `${baseUrl}/auth/migrate-anonymous`
       }
+=======
+    async signIn() {
+      try {
+        return true
+      } catch (error) {
+        console.error('SignIn callback error:', error)
+        return false
+      }
+    },
+    async redirect({ url, baseUrl }) {
+      // Garantir redirect para /dashboard após sucesso
+      try {
+        const u = new URL(url, baseUrl)
+        if (u.origin === baseUrl) return u.toString()
+      } catch {}
+>>>>>>> kyroia
       return `${baseUrl}/dashboard`
     }
   },

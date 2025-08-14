@@ -39,7 +39,7 @@ const plans = [
     id: 'pro',
     name: 'Pro',
     description: 'Para profissionais',
-    monthlyPrice: 79.90,  // Alinhado com InnerAI
+    monthlyPrice: 79.90,  // Alinhado com Kyroia
     yearlyPrice: 31.96,   // 60% de desconto
     yearlyTotal: 383.52,  // 31.96 * 12
     icon: Crown,

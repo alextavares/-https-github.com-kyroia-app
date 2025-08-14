@@ -41,7 +41,7 @@ export default function TesteGratisPage() {
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <span className="text-xl font-bold text-primary">AI</span>
               </div>
-              <span className="text-xl font-semibold">InnerAI</span>
+              <span className="text-xl font-semibold">Kyroia</span>
             </Link>
             <nav className="hidden md:flex items-center gap-8">
               <Link href="#recursos" className="text-sm hover:text-primary transition-colors">
@@ -122,7 +122,7 @@ export default function TesteGratisPage() {
               <div className="relative rounded-2xl overflow-hidden shadow-2xl">
                 <img 
                   src="/api/placeholder/600/400" 
-                  alt="InnerAI Dashboard"
+                  alt="Kyroia Dashboard"
                   className="w-full"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent" />
@@ -372,7 +372,7 @@ export default function TesteGratisPage() {
                 ))}
               </div>
               <p className="text-muted-foreground mb-4">
-                "O InnerAI revolucionou minha forma de trabalhar. Consigo criar conteúdo 10x mais rápido!"
+                "O Kyroia revolucionou minha forma de trabalhar. Consigo criar conteúdo 10x mais rápido!"
               </p>
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10" />
@@ -453,7 +453,7 @@ export default function TesteGratisPage() {
                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <span className="text-xl font-bold text-primary">AI</span>
                 </div>
-                <span className="text-xl font-semibold">InnerAI</span>
+                <span className="text-xl font-semibold">Kyroia</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 A plataforma de IA mais completa para acelerar seu trabalho.
@@ -489,7 +489,7 @@ export default function TesteGratisPage() {
           </div>
 
           <div className="mt-8 pt-8 border-t border-border/50 text-center text-sm text-muted-foreground">
-            <p>&copy; 2024 InnerAI. Todos os direitos reservados.</p>
+            <p>&copy; 2024 Kyroia. Todos os direitos reservados.</p>
           </div>
         </div>
       </footer>

@@ -172,7 +172,8 @@ export class OpenAIProvider implements AIProvider {
       
       const stream = await this.openai.chat.completions.create({
         model,
-        messages: processedMessages,
+        // @ts-ignore – compatibilidade com conteúdos multimodais em diferentes versões do SDK
+        messages: processedMessages as any,
         max_tokens: options?.maxTokens || 1000,
         temperature: options?.temperature || 0.7,
         stream: true,

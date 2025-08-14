@@ -13,7 +13,7 @@ export async function GET() {
       },
       {
         role: "user",
-        content: "Olá! Diga 'InnerAI está funcionando!' se você conseguir me ouvir."
+        content: "Olá! Diga 'Kyroia está funcionando!' se você conseguir me ouvir."
       }
     ]
 

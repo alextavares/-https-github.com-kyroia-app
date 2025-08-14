@@ -72,7 +72,7 @@ test.describe('InnerAI - Teste Otimizado de Login e Chat', () => {
     await page.screenshot({ path: 'test-results/01-homepage.png', fullPage: true });
     
     // Verificar se a página carregou
-    await expect(page).toHaveTitle(/Inner AI Clone/i);
+    await expect(page).toHaveTitle(/Kyroia/i);
     console.log('✅ Homepage carregada com sucesso');
   });
 

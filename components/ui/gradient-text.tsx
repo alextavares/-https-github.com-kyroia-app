@@ -1,4 +1,4 @@
-// Componente para textos com gradiente como no Inner AI
+// Componente para textos com gradiente como no Kyroia
 
 export function GradientText({ 
   children, 

@@ -1,22 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
+import { handleRoute, DomainError } from '@/lib/http/errors'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      )
+export async function GET() {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
-    // Get user with current plan
+    // Buscar usuário básico
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: auth.userId },
       select: {
         id: true,
         email: true,
@@ -26,105 +25,110 @@ export async function GET(request: NextRequest) {
     })
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Usuário não encontrado' },
-        { status: 404 }
-      )
+      throw new DomainError('NOT_FOUND', 'Usuário não encontrado')
     }
 
-    // Get active subscription
-    let subscription = await prisma.subscription.findFirst({
-      where: {
-        userId: session.user.id,
-        status: 'ACTIVE',
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
+    // Buscar assinatura ativa mais recente SEM acessar prisma.subscription diretamente (workaround tipagem)
+    const subscriptionRecords = await prisma.$queryRaw<
+      Array<{
+        id: string
+        status: string
+        plan: string | null
+        currentPeriodStart: string | null
+        currentPeriodEnd: string | null
+        createdAt: string
+        updatedAt: string
+      }>
+    >`
+      SELECT id, status, plan, currentPeriodStart, currentPeriodEnd, createdAt, updatedAt
+      FROM Subscription
+      WHERE userId = ${user.id} AND status = 'ACTIVE'
+      ORDER BY createdAt DESC
+      LIMIT 1
+    `
 
-    // If no active subscription is found in the database
+    let subscription = subscriptionRecords[0]
+      ? {
+          id: subscriptionRecords[0].id,
+          status: subscriptionRecords[0].status,
+          plan: subscriptionRecords[0].plan,
+          currentPeriodStart: subscriptionRecords[0].currentPeriodStart ? new Date(subscriptionRecords[0].currentPeriodStart) : null,
+          currentPeriodEnd: subscriptionRecords[0].currentPeriodEnd ? new Date(subscriptionRecords[0].currentPeriodEnd) : null,
+          createdAt: new Date(subscriptionRecords[0].createdAt),
+          updatedAt: new Date(subscriptionRecords[0].updatedAt),
+        }
+      : null
+
     if (!subscription) {
-      // If the user's plan type in the User table is FREE, return a default FREE plan structure
       if (user.planType === 'FREE') {
-        return NextResponse.json({
+        const res = NextResponse.json({
           subscription: {
-            id: 'free-plan-active', // Static ID for default free plan representation
+            id: 'free-plan-active',
             planType: 'FREE',
             status: 'ACTIVE' as const,
             startedAt: user.createdAt || new Date().toISOString(),
             expiresAt: null,
             stripeSubscriptionId: null,
-            // Add other fields expected by the frontend for a subscription object, if any
-          }
+          },
         })
+        setNoStore(res)
+        return res
       } else {
-        // If user.planType is a paid plan but no active Subscription record exists,
-        // this indicates an inconsistency. Return null for subscription.
-        // The frontend should handle this by showing an error or a specific message.
-        console.error(`Inconsistency: User ${user.id} has plan ${user.planType} but no active subscription record.`);
-        return NextResponse.json({ subscription: null })
+        const res = NextResponse.json({ subscription: null })
+        setNoStore(res)
+        return res
       }
     }
 
-    // If an active subscription is found
-    if (subscription) {
-      const now = new Date();
-      // Check if the subscription has an expiration date and if it has passed
-      if (subscription.expiresAt && new Date(subscription.expiresAt) < now) {
-        console.log(`Subscription ${subscription.id} for user ${user.id} has expired. Updating status.`);
-        // Subscription has expired, update its status and user's plan
-        await prisma.subscription.update({
-          where: { id: subscription.id },
-          data: { status: 'EXPIRED' },
-        });
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { planType: 'FREE' },
-        });
-        // After invalidating the current subscription, set it to null
-        // so the logic below correctly identifies that there's no active paid subscription.
-        subscription = null;
-      }
+    // Verificação de expiração c/ schema: currentPeriodEnd
+    const now = new Date()
+    const periodEnd = subscription?.currentPeriodEnd ?? null
+    if (periodEnd && new Date(periodEnd) < now) {
+      // Atualiza status via delegate
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { status: 'EXPIRED' }
+      })
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { planType: 'FREE' },
+      })
+      subscription = null
     }
 
-    // If no active subscription is found (either initially or after expiration handling)
     if (!subscription) {
-      // If the user's plan type in the User table is FREE (possibly after being reset above),
-      // or if it was already FREE and no active subscription record was found.
-      // It's important to re-check user.planType if it could have been modified by the expiration logic.
-      // However, for simplicity, we use the user object as fetched initially,
-      // and if an expiration occurred, 'subscription' is now null.
-
-      // Let's re-fetch the user's current planType if subscription was set to null due to expiration
-      const currentUserPlanType = user.id === session.user.id ? (await prisma.user.findUnique({ where: { id: user.id } }))?.planType : user.planType;
+      const currentUserPlanType =
+        (await prisma.user.findUnique({ where: { id: user.id }, select: { planType: true } }))?.planType ?? user.planType
 
       if (currentUserPlanType === 'FREE') {
-        return NextResponse.json({
+        const res = NextResponse.json({
           subscription: {
-            id: 'free-plan-active', // Static ID for default free plan representation
+            id: 'free-plan-active',
             planType: 'FREE',
             status: 'ACTIVE' as const,
             startedAt: user.createdAt || new Date().toISOString(),
             expiresAt: null,
             stripeSubscriptionId: null,
-          }
+          },
         })
-      } else {
-        // If user.planType is still a paid plan but 'subscription' became null (e.g. error or unhandled case)
-        // This indicates an inconsistency.
-        console.error(`Inconsistency: User ${user.id} has plan ${currentUserPlanType} but no active subscription object available after checks.`);
-        return NextResponse.json({ subscription: null })
+        setNoStore(res)
+        return res
       }
+      return NextResponse.json({ subscription: null })
     }
 
-    // If an active subscription is found and it has not expired, return it
-    return NextResponse.json({ subscription })
-  } catch (error) {
-    console.error('Get subscription error:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
-  }
+    // Normaliza payload público da assinatura ativa
+    const res = NextResponse.json({
+      subscription: {
+        id: subscription.id,
+        planType: subscription.plan ?? user.planType ?? 'FREE',
+        status: subscription.status,
+        startedAt: subscription.currentPeriodStart ?? subscription.createdAt,
+        expiresAt: subscription.currentPeriodEnd ?? null,
+        stripeSubscriptionId: null,
+      },
+    })
+    setNoStore(res)
+    return res
+  })
 }

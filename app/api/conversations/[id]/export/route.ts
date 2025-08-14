@@ -1,74 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth/guards'
+import { setDownloadHeaders } from '@/lib/cache/headers'
 import { prisma } from '@/lib/prisma'
+import { handleRoute, Unauthorized, NotFound, BadRequest } from '@/lib/http/errors'
 
+/**
+ * GET /api/conversations/[id]/export
+ * Alinha ao padrão: handleRoute + DomainError + no-store + headers de download.
+ * Ajuste importante: params é síncrono no App Router.
+ */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: 'Não autorizado' },
-        { status: 401 }
-      )
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      // Padroniza via helper de erro
+      return Unauthorized('Não autorizado')
+    }
+
+    const { id } = params
+    if (!id) {
+      return BadRequest('Parâmetro "id" ausente')
     }
 
     const { searchParams } = new URL(request.url)
-    const format = searchParams.get('format') || 'json'
+    const format = (searchParams.get('format') || 'json').toLowerCase()
 
+    // Helper simples para identificar o usuário a partir do contexto
+    function userIdentifierFromAuth(a: { ok: true; userId: string }): string {
+      return a.userId
+    }
+
+    // Leitura alinhada ao schema relacional atual (Conversation 1-N Message)
     const conversation = await prisma.conversation.findFirst({
-      where: {
-        id: id,
-        userId: session.user.id
+      where: { id, userId: auth.userId },
+      select: {
+        id: true,
+        title: true,
+        modelUsed: true,
+        createdAt: true,
+        updatedAt: true,
       },
-      include: {
-        messages: {
-          orderBy: {
-            createdAt: 'asc'
-          },
-          select: {
-            role: true,
-            content: true,
-            createdAt: true
-          }
-        },
-        user: {
-          select: {
-            name: true,
-            email: true
-          }
-        }
-      }
     })
 
     if (!conversation) {
-      return NextResponse.json(
-        { message: 'Conversa não encontrada' },
-        { status: 404 }
-      )
+      return NotFound('Conversa não encontrada')
     }
+
+    // Buscar mensagens ordenadas cronologicamente
+    const dbMessages = await prisma.message.findMany({
+      where: { conversationId: id },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        role: true,
+        content: true,
+        createdAt: true,
+      },
+    })
+
+    // Normalizar payload para export mantendo compatibilidade
+    const messages = dbMessages.map((m) => ({
+      role: typeof m.role === 'string' ? m.role : 'ASSISTANT',
+      content: typeof m.content === 'string' ? m.content : String((m as unknown as { content?: unknown }).content ?? ''),
+      createdAt: m.createdAt ? new Date(m.createdAt).toISOString() : undefined,
+    }))
 
     const exportData = {
       title: conversation.title,
       model: conversation.modelUsed,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
-      user: conversation.user.name || conversation.user.email,
-      messages: conversation.messages
+      user: userIdentifierFromAuth(auth),
+      messages,
     }
 
+    const baseFilename = `${(conversation.title || 'conversa').replace(/[^\p{L}\p{N}\-_ ]/gu, '').trim() || 'conversa'}-${new Date().toISOString().split('T')[0]}`
+
     if (format === 'json') {
-      return NextResponse.json(exportData, {
-        headers: {
-          'Content-Disposition': `attachment; filename="${conversation.title || 'conversa'}-${new Date().toISOString().split('T')[0]}.json"`
-        }
-      })
-    } else if (format === 'md' || format === 'markdown') {
+      const res = NextResponse.json(exportData)
+      setDownloadHeaders(res, `${baseFilename}.json`, 'application/json')
+      return res
+    }
+
+    if (format === 'md' || format === 'markdown') {
       let markdown = `# ${exportData.title}\n\n`
       markdown += `**Modelo:** ${exportData.model}\n`
       markdown += `**Data:** ${new Date(exportData.createdAt).toLocaleDateString('pt-BR')}\n`
@@ -76,21 +92,20 @@ export async function GET(
       markdown += `---\n\n`
 
       exportData.messages.forEach((msg) => {
-        const timestamp = new Date(msg.createdAt).toLocaleTimeString('pt-BR')
+        const timestamp = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('pt-BR') : ''
         if (msg.role === 'USER') {
-          markdown += `### 👤 Usuário (${timestamp})\n\n${msg.content}\n\n`
+          markdown += `### 👤 Usuário${timestamp ? ` (${timestamp})` : ''}\n\n${msg.content}\n\n`
         } else {
-          markdown += `### 🤖 Assistente (${timestamp})\n\n${msg.content}\n\n`
+          markdown += `### 🤖 Assistente${timestamp ? ` (${timestamp})` : ''}\n\n${msg.content}\n\n`
         }
       })
 
-      return new NextResponse(markdown, {
-        headers: {
-          'Content-Type': 'text/markdown',
-          'Content-Disposition': `attachment; filename="${conversation.title || 'conversa'}-${new Date().toISOString().split('T')[0]}.md"`
-        }
-      })
-    } else if (format === 'txt') {
+      const res = new NextResponse(markdown)
+      setDownloadHeaders(res, `${baseFilename}.md`, 'text/markdown; charset=utf-8')
+      return res
+    }
+
+    if (format === 'txt') {
       let text = `${exportData.title}\n`
       text += `${'='.repeat(exportData.title?.length || 10)}\n\n`
       text += `Modelo: ${exportData.model}\n`
@@ -99,31 +114,20 @@ export async function GET(
       text += `${'-'.repeat(50)}\n\n`
 
       exportData.messages.forEach((msg) => {
-        const timestamp = new Date(msg.createdAt).toLocaleTimeString('pt-BR')
+        const timestamp = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('pt-BR') : ''
         if (msg.role === 'USER') {
-          text += `[USUÁRIO - ${timestamp}]\n${msg.content}\n\n`
+          text += `[USUÁRIO${timestamp ? ` - ${timestamp}` : ''}]\n${msg.content}\n\n`
         } else {
-          text += `[ASSISTENTE - ${timestamp}]\n${msg.content}\n\n`
+          text += `[ASSISTENTE${timestamp ? ` - ${timestamp}` : ''}]\n${msg.content}\n\n`
         }
       })
 
-      return new NextResponse(text, {
-        headers: {
-          'Content-Type': 'text/plain',
-          'Content-Disposition': `attachment; filename="${conversation.title || 'conversa'}-${new Date().toISOString().split('T')[0]}.txt"`
-        }
-      })
+      const res = new NextResponse(text)
+      setDownloadHeaders(res, `${baseFilename}.txt`, 'text/plain; charset=utf-8')
+      return res
     }
 
-    return NextResponse.json(
-      { message: 'Formato não suportado. Use: json, md, markdown ou txt' },
-      { status: 400 }
-    )
-  } catch (error) {
-    console.error('Export conversation error:', error)
-    return NextResponse.json(
-      { message: 'Erro ao exportar conversa' },
-      { status: 500 }
-    )
-  }
+    // Formato inválido → DomainError/BadRequest padronizado
+    return BadRequest('Formato não suportado. Use: json, md, markdown ou txt')
+  })
 }

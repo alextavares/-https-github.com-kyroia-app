@@ -38,6 +38,8 @@ interface UserSettings {
   aiResponseStyle: 'concise' | 'detailed' | 'balanced'
   autoSaveConversations: boolean
   shareUsageData: boolean
+  usageVisibility?: 'never' | 'low' | 'always'
+  showResponseCost?: boolean
 }
 
 export default function SettingsPage() {
@@ -50,6 +52,8 @@ export default function SettingsPage() {
     aiResponseStyle: 'balanced',
     autoSaveConversations: true,
     shareUsageData: false,
+    usageVisibility: 'low',
+    showResponseCost: false,
   })
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -62,6 +66,13 @@ export default function SettingsPage() {
       setSettings(parsed)
       setTheme(parsed.theme)
     }
+    // Backfill preferência isolada usada no chat (compat)
+    try {
+      const vv = localStorage.getItem('usageVisibility')
+      if (vv === 'never' || vv === 'low' || vv === 'always') {
+        setSettings(s => ({ ...s, usageVisibility: vv }))
+      }
+    } catch {}
   }, [setTheme])
 
   const updateSetting = <K extends keyof UserSettings>(
@@ -81,6 +92,12 @@ export default function SettingsPage() {
     try {
       // Save to localStorage
       localStorage.setItem('userSettings', JSON.stringify(settings))
+      // Persistir preferência de visibilidade para o chat
+      if (settings.usageVisibility) {
+        localStorage.setItem('usageVisibility', settings.usageVisibility)
+      }
+      // Preferência local para custo de resposta
+      localStorage.setItem('showResponseCost', String(!!settings.showResponseCost))
       
       // In production, save to API
       // await fetch('/api/user/settings', {
@@ -161,7 +178,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground">
-          Personalize sua experiência no InnerAI
+          Personalize sua experiência no Kyroia
         </p>
       </div>
 
@@ -307,6 +324,42 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
+              <Label htmlFor="usage-visibility">Visibilidade de uso/créditos</Label>
+              <p className="text-sm text-muted-foreground">
+                Controle quando mostrar sua barra/alertas de uso
+              </p>
+            </div>
+            <Select
+              value={settings.usageVisibility}
+              onValueChange={(value) => updateSetting('usageVisibility', value as any)}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="never">Nunca mostrar</SelectItem>
+                <SelectItem value="low">Somente quando estiver baixo (padrão)</SelectItem>
+                <SelectItem value="always">Mostrar sempre</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="show-response-cost">Mostrar custo por resposta</Label>
+              <p className="text-sm text-muted-foreground">
+                Exibe o custo estimado de cada resposta da IA (oculto por padrão)
+              </p>
+            </div>
+            <Switch
+              id="show-response-cost"
+              checked={!!settings.showResponseCost}
+              onCheckedChange={(checked) => updateSetting('showResponseCost', checked)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
               <Label htmlFor="response-style">Estilo de resposta</Label>
               <p className="text-sm text-muted-foreground">
                 Como a IA deve responder suas perguntas
@@ -361,7 +414,7 @@ export default function SettingsPage() {
             <div className="space-y-0.5">
               <Label htmlFor="share-usage">Compartilhar dados de uso</Label>
               <p className="text-sm text-muted-foreground">
-                Ajude a melhorar o InnerAI compartilhando dados anônimos
+                Ajude a melhorar o Kyroia compartilhando dados anônimos
               </p>
             </div>
             <Switch

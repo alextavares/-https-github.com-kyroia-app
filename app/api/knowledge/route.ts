@@ -72,14 +72,10 @@ export async function GET() {
       },
       select: {
         id: true,
-        name: true,
-        description: true,
+        title: true,
         type: true,
-        fileSize: true,
-        mimeType: true,
-        originalName: true,
         createdAt: true,
-        updatedAt: true,
+        updatedAt: true
       }
     })
 
@@ -139,11 +135,31 @@ export async function POST(request: NextRequest) {
       processedContent = await extractTextFromFile(validatedData.content, validatedData.mimeType)
     }
 
+    // Normalizar campos opcionais evitando 'any'
+    const metadataStr: string | null =
+      typeof validatedData.metadata === 'object' && validatedData.metadata !== null
+        ? JSON.stringify(validatedData.metadata)
+        : (typeof validatedData.metadata === 'string' ? validatedData.metadata : null)
+
+    const mimeTypeStr: string | null =
+      typeof (validatedData as { mimeType?: unknown }).mimeType === 'string'
+        ? (validatedData as { mimeType?: string }).mimeType!
+        : null
+
+    const originalNameStr: string | null =
+      typeof (validatedData as { originalName?: unknown }).originalName === 'string'
+        ? (validatedData as { originalName?: string }).originalName!
+        : null
+
     const knowledge = await prisma.knowledgeBase.create({
       data: {
-        ...validatedData,
+        title: validatedData.name,
         content: processedContent,
         userId: user.id,
+        type: validatedData.type,
+        ...(metadataStr !== null ? { metadata: metadataStr } : {}),
+        ...(mimeTypeStr !== null ? { mimeType: mimeTypeStr } : {}),
+        ...(originalNameStr !== null ? { originalName: originalNameStr } : {})
       }
     })
 

@@ -1,49 +1,21 @@
-/** @type {import('jest').Config} */
 const config = {
-  preset: 'ts-jest',
-  testEnvironment: 'jsdom',
-  roots: ['<rootDir>/tests'],
-  testMatch: [
-    '<rootDir>/tests/**/*.test.{js,jsx,ts,tsx}',
-  ],
-  transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
-  },
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
-    '^~/(.*)$': '<rootDir>/$1',
-    '^components/(.*)$': '<rootDir>/components/$1',
-    '^lib/(.*)$': '<rootDir>/lib/$1',
-    '^utils/(.*)$': '<rootDir>/utils/$1',
-    '^hooks/(.*)$': '<rootDir>/hooks/$1',
-    '^app/(.*)$': '<rootDir>/app/$1',
-  },
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  collectCoverage: true,
-  collectCoverageFrom: [
-    'app/**/*.{js,jsx,ts,tsx}',
-    'components/**/*.{js,jsx,ts,tsx}',
-    'lib/**/*.{js,jsx,ts,tsx}',
-    'utils/**/*.{js,jsx,ts,tsx}',
-    'hooks/**/*.{js,jsx,ts,tsx}',
-    '!**/*.d.ts',
-    '!**/node_modules/**',
-    '!**/.next/**',
-  ],
-  coverageReporters: ['text', 'lcov', 'html'],
-  coverageDirectory: 'coverage',
-  testTimeout: 30000,
-  maxWorkers: '50%',
-  verbose: true,
-  transformIgnorePatterns: [
-    'node_modules/(?!(jose|openid-client|@auth|next-auth|@mercadopago|uuid)/)',
-  ],
-  extensionsToTreatAsEsm: ['.ts', '.tsx'],
-  globals: {
-    'ts-jest': {
-      useESM: true,
+    preset: 'ts-jest',
+    testEnvironment: 'node',
+    roots: ['<rootDir>'],
+    moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+    testMatch: ['<rootDir>/tests/**/*.test.(ts|tsx|js)'],
+    setupFilesAfterEnv: ['<rootDir>/tests/setupTests.ts'],
+    moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/$1',
     },
-  },
+    transform: {
+        '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+    },
+    clearMocks: true,
+    restoreMocks: true,
+    verbose: true,
+    // Silencia warnings de ESM de next/edge em ambiente de testes Node
+    transformIgnorePatterns: ['/node_modules/'],
 };
-
-module.exports = config;
+export default config;
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiamVzdC5jb25maWcuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJqZXN0LmNvbmZpZy50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFFQSxNQUFNLE1BQU0sR0FBVztJQUNyQixNQUFNLEVBQUUsU0FBUztJQUNqQixlQUFlLEVBQUUsTUFBTTtJQUN2QixLQUFLLEVBQUUsQ0FBQyxXQUFXLENBQUM7SUFDcEIsb0JBQW9CLEVBQUUsQ0FBQyxJQUFJLEVBQUUsS0FBSyxFQUFFLElBQUksRUFBRSxLQUFLLEVBQUUsTUFBTSxDQUFDO0lBQ3hELFNBQVMsRUFBRSxDQUFDLHVDQUF1QyxDQUFDO0lBQ3BELGtCQUFrQixFQUFFLENBQUMsK0JBQStCLENBQUM7SUFDckQsZ0JBQWdCLEVBQUU7UUFDaEIsVUFBVSxFQUFFLGNBQWM7S0FDM0I7SUFDRCxTQUFTLEVBQUU7UUFDVCxpQkFBaUIsRUFBRSxDQUFDLFNBQVMsRUFBRSxFQUFFLFFBQVEsRUFBRSx5QkFBeUIsRUFBRSxDQUFDO0tBQ3hFO0lBQ0QsVUFBVSxFQUFFLElBQUk7SUFDaEIsWUFBWSxFQUFFLElBQUk7SUFDbEIsT0FBTyxFQUFFLElBQUk7SUFDYixtRUFBbUU7SUFDbkUsdUJBQXVCLEVBQUUsQ0FBQyxnQkFBZ0IsQ0FBQztDQUM1QyxDQUFBO0FBRUQsZUFBZSxNQUFNLENBQUEifQ==

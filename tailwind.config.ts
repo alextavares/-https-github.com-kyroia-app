@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
   	extend: {
   		colors: {
-  			// Cores customizadas do Inner AI
+  			// Cores customizadas do Kyroia
   			primary: {
   				DEFAULT: 'var(--primary)',
   				hover: 'var(--primaryHover)',

@@ -1,38 +1,51 @@
 #!/usr/bin/env node
 
-// Worker process that runs webhook processing every minute
-// This is designed to run continuously on Digital Ocean App Platform
+// Worker process that calls the API endpoint to process pending MercadoPago webhooks
+// Runs continuously (every minute) on Digital Ocean App Platform
 
-const { exec } = require('child_process');
-const path = require('path');
+const BASE_URL = process.env.APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
+const WORKER_TOKEN = process.env.WEBHOOK_WORKER_TOKEN || '';
 
-console.log('Webhook worker started');
-console.log('Will process pending webhooks every minute');
-
-// Function to run the webhook processor
-function processWebhooks() {
-  const scriptPath = path.join(__dirname, '..', 'process-pending-webhooks.ts');
-  
-  console.log(`[${new Date().toISOString()}] Running webhook processor...`);
-  
-  exec(`npx tsx ${scriptPath}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`[${new Date().toISOString()}] Error running webhook processor:`, error);
-      if (stderr) console.error('stderr:', stderr);
-    } else {
-      if (stdout) console.log(stdout);
-      console.log(`[${new Date().toISOString()}] Webhook processing completed`);
-    }
-  });
+function nowIso() {
+  return new Date().toISOString();
 }
 
+async function callProcessPending() {
+  const url = `${BASE_URL.replace(/\/$/, '')}/api/mercadopago/webhook/process-pending`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'x-worker-token': WORKER_TOKEN,
+      },
+    });
+
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+
+    if (!res.ok) {
+      console.error(`[${nowIso()}] Process-pending failed (${res.status}):`, data);
+      return;
+    }
+
+    console.log(`[${nowIso()}] Processed OK:`, data);
+  } catch (err) {
+    console.error(`[${nowIso()}] Error calling process-pending:`, err);
+  }
+}
+
+console.log('Webhook worker started');
+console.log(`Base URL: ${BASE_URL}`);
+console.log('Will process pending webhooks every minute');
+
 // Run immediately on startup
-processWebhooks();
+callProcessPending();
 
 // Schedule to run every minute
-setInterval(processWebhooks, 60 * 1000);
+setInterval(callProcessPending, 60 * 1000);
 
-// Keep the process alive
+// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('Webhook worker shutting down gracefully...');
   process.exit(0);

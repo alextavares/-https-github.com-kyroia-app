@@ -33,17 +33,38 @@ export async function middleware(request: NextRequest) {
                       request.nextUrl.pathname.startsWith('/payment/')
   const isOnboardingPage = request.nextUrl.pathname === '/onboarding'
   const isApiAuthRoute = request.nextUrl.pathname.startsWith('/api/auth')
+  // Special-case: debug APIs
+  const isDebugApiRoute = request.nextUrl.pathname.startsWith('/api/debug/')
+
+  // In production, hide debug APIs entirely
+  if (isDebugApiRoute) {
+    if (process.env.NODE_ENV !== 'development') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    return NextResponse.next()
+  }
+
   const isPublicApiRoute = request.nextUrl.pathname.startsWith('/api/test-ai-public') || 
+                          request.nextUrl.pathname.startsWith('/api/chat') ||
                           request.nextUrl.pathname.startsWith('/api/test-stream-public') ||
                           request.nextUrl.pathname.startsWith('/api/public/') ||
                           request.nextUrl.pathname === '/api/health' ||
                           request.nextUrl.pathname === '/api/public-test-chat' ||
                           request.nextUrl.pathname.startsWith('/api/mercadopago/webhook') ||
+                          (process.env.NODE_ENV === 'development' && request.nextUrl.pathname.startsWith('/api/mercadopago/webhook-logs')) ||
+                          // Dev helper to generate MP preference without auth
+                          (process.env.NODE_ENV === 'development' && request.nextUrl.pathname.startsWith('/api/mercadopago/dev-create-preference')) ||
+                          // Dev helper to reprocess payment without auth
+                          (process.env.NODE_ENV === 'development' && request.nextUrl.pathname.startsWith('/api/mercadopago/dev-process')) ||
+                          request.nextUrl.pathname.startsWith('/api/payments/status') ||
                           request.nextUrl.pathname.startsWith('/api/stripe/webhook') ||
                           request.nextUrl.pathname === '/api/test-webhook' ||
                           request.nextUrl.pathname.startsWith('/api/test/simulate-payment') ||
+<<<<<<< HEAD
                           request.nextUrl.pathname.startsWith('/api/debug/') ||
                           request.nextUrl.pathname === '/api/debug-env' ||
+=======
+>>>>>>> kyroia
                           request.nextUrl.pathname.startsWith('/api/test-auth') ||
                           request.nextUrl.pathname.startsWith('/api/health-check') ||
                           request.nextUrl.pathname === '/api/chat-anonymous' ||

@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { ChevronDown, Sparkles, Zap, Brain, Gauge, Globe, ImageIcon, Video, Mic } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { INNERAI_MODELS, type AIModel as InnerAIModel } from "@/lib/ai/innerai-models-config"
+import { INNERAI_MODELS, type AIModel as KyroiaModel, getModelsForPlan } from "@/lib/ai/innerai-models-config"
 
 export interface AIModel {
   id: string
@@ -33,8 +33,8 @@ export interface AIModel {
   isAvailable: boolean
 }
 
-// Função para mapear modelos InnerAI para interface local
-const mapInnerAIModel = (model: InnerAIModel): AIModel => {
+// Função para mapear modelos Kyroia para interface local
+const mapKyroiaModel = (model: KyroiaModel): AIModel => {
   const getIcon = () => {
     if (model.features.includes('Web Search')) return <Globe className="h-4 w-4" />
     if (model.category === 'fast') return <Zap className="h-4 w-4" />
@@ -95,26 +95,66 @@ const mapInnerAIModel = (model: InnerAIModel): AIModel => {
   }
 }
 
-// Converter e filtrar apenas modelos disponíveis
-const models: AIModel[] = INNERAI_MODELS
-  .filter(model => model.isAvailable)
-  .map(mapInnerAIModel)
+// Converter e filtrar apenas modelos disponíveis por plano atual (carregado no client)
+function computeModelsForPlan(plan: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'): AIModel[] {
+  try {
+    return getModelsForPlan(plan)
+      .filter(m => m.isAvailable)
+      .map(mapKyroiaModel)
+  } catch {
+    return INNERAI_MODELS.filter(m => m.isAvailable).map(mapKyroiaModel)
+  }
+}
 
 export function ModelSelector() {
-  const [selectedModel, setSelectedModel] = useState<AIModel>(models[0])
+  const [planType, setPlanType] = useState<'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'>('FREE')
+  const [models, setModels] = useState<AIModel[]>(computeModelsForPlan('FREE'))
+  const [selectedModel, setSelectedModel] = useState<AIModel>(computeModelsForPlan('FREE')[0])
 
-  // Load saved model from localStorage
+  // Load plan + saved model from localStorage
   useEffect(() => {
-    const savedModelId = localStorage.getItem("selectedModel")
-    if (savedModelId) {
-      const model = models.find(m => m.id === savedModelId)
-      if (model) setSelectedModel(model)
+    try {
+      const savedPlan = localStorage.getItem('lastPlanType') as typeof planType | null
+      if (savedPlan === 'FREE' || savedPlan === 'LITE' || savedPlan === 'PRO' || savedPlan === 'ENTERPRISE') {
+        setPlanType(savedPlan)
+        const ms = computeModelsForPlan(savedPlan)
+        setModels(ms)
+        setSelectedModel(ms[0])
+      }
+      const savedModelId = localStorage.getItem(`selectedModel:${savedPlan ?? 'FREE'}`)
+      if (savedModelId) {
+        const found = computeModelsForPlan(savedPlan ?? 'FREE').find(m => m.id === savedModelId)
+        if (found) setSelectedModel(found)
+      }
+    } catch {}
+  }, [])
+
+  // Try loading plan from API
+  useEffect(() => {
+    const loadPlan = async () => {
+      try {
+        const res = await fetch('/api/subscription', { cache: 'no-store' })
+        if (res.ok) {
+          const json = await res.json()
+          const pt = (json?.planType || 'FREE') as typeof planType
+          setPlanType(pt)
+          localStorage.setItem('lastPlanType', pt)
+          const ms = computeModelsForPlan(pt)
+          setModels(ms)
+          // If current selected not in new set, fallback
+          if (!ms.some(m => m.id === selectedModel.id)) {
+            setSelectedModel(ms[0])
+          }
+        }
+      } catch {}
     }
-  }, []) // Empty dependency array to run only once
+    loadPlan()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleModelSelect = (model: AIModel) => {
     setSelectedModel(model)
-    localStorage.setItem("selectedModel", model.id)
+    localStorage.setItem(`selectedModel:${planType}`, model.id)
   }
 
   const getSpeedIcon = (speed: string) => {
@@ -135,7 +175,7 @@ export function ModelSelector() {
     }
   }
 
-  // Agrupar modelos por categoria - EXATAMENTE como no InnerAI
+  // Agrupar modelos por categoria - EXATAMENTE como no Kyroia
   const fastModels = models.filter(m => m.category === 'fast')
   const advancedModels = models.filter(m => m.category === 'advanced')
   const reasoningModels = models.filter(m => m.category === 'reasoning')

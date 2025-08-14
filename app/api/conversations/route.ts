@@ -1,88 +1,31 @@
-import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { requireAuth } from "@/lib/auth/guards"
+import { handleRoute, Unauthorized } from "@/lib/http/errors"
+import { ConversationsService, ConversationCreateInput } from "@/services/conversations"
 
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "Não autorizado" },
-        { status: 401 }
-      )
-    }
+/**
+ * Padronização App Router:
+ * - export const GET/POST = handleRoute(async (req) => { ... })
+ * - requireAuth para 401 estável
+ * - evitar retornar Promise diretamente em export
+ */
 
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        userId: session.user.id
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      },
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        updatedAt: true,
-        modelUsed: true,
-        isArchived: true,
-        _count: {
-          select: {
-            messages: true
-          }
-        }
-      }
-    })
+export const GET = handleRoute(async () => {
+  const auth = await requireAuth()
+  if (!auth.ok) return Unauthorized()
 
-    // Formata as conversas para incluir messagesCount
-    const formattedConversations = conversations.map(conv => ({
-      ...conv,
-      messagesCount: conv._count.messages,
-      _count: undefined
-    }))
+  const payload = await ConversationsService.listByUser(auth.userId)
+  return payload
+})
 
-    return NextResponse.json(formattedConversations)
+export const POST = handleRoute(async (req: Request) => {
+  const auth = await requireAuth()
+  if (!auth.ok) return Unauthorized()
 
-  } catch (error) {
-    console.error("Conversations API error:", error)
-    return NextResponse.json(
-      { message: "Erro interno do servidor" },
-      { status: 500 }
-    )
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "Não autorizado" },
-        { status: 401 }
-      )
-    }
-
-    const { title, modelUsed } = await request.json()
-
-    const conversation = await prisma.conversation.create({
-      data: {
-        title: title || "Nova Conversa",
-        modelUsed: modelUsed || "gpt-3.5-turbo",
-        userId: session.user.id,
-        isArchived: false
-      }
-    })
-
-    return NextResponse.json(conversation)
-
-  } catch (error) {
-    console.error("Create conversation error:", error)
-    return NextResponse.json(
-      { message: "Erro ao criar conversa" },
-      { status: 500 }
-    )
-  }
-}
+  const body = (await req.json().catch(() => ({}))) as Omit<ConversationCreateInput, "userId">
+  const created = await ConversationsService.create({
+    userId: auth.userId,
+    title: body.title,
+    modelUsed: body.modelUsed,
+  })
+  return created
+})

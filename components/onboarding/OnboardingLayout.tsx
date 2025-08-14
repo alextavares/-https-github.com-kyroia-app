@@ -58,7 +58,7 @@ export default function OnboardingLayout({
                 <span className="text-white font-bold text-sm">IA</span>
               </div>
               <div>
-                <div className="font-medium">Inner AI</div>
+                <div className="font-medium">Kyroia</div>
                 <div className="text-xs text-muted-foreground">GPT-4o</div>
               </div>
             </div>
@@ -90,7 +90,7 @@ export default function OnboardingLayout({
             {/* Input */}
             <div className="p-4 border-t border-border">
               <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
-                <div className="text-sm text-muted-foreground flex-1">Message Inner AI</div>
+                <div className="text-sm text-muted-foreground flex-1">Message Kyroia</div>
                 <div className="w-4 h-4 bg-primary/50 rounded"></div>
               </div>
             </div>

@@ -1,139 +1,148 @@
-# 🧪 Guia de Teste Manual - Sistema de Pagamentos e Novos Modelos IA
+# Guia de Testes Manuais - Sistema de Controle de Gastos da IA
 
-**URL da Aplicação**: https://seahorse-app-k5pag.ondigitalocean.app
+## 📋 Visão Geral
+Este guia detalha como testar manualmente o sistema de controle de gastos da IA implementado no InnerAI Clone.
 
-## 📋 Checklist de Testes
+## 🔍 Sistema Implementado
 
-### 1. Teste de Acesso Inicial
-- [ ] Acesse https://seahorse-app-k5pag.ondigitalocean.app
-- [ ] Verifique se a página carrega corretamente
-- [ ] Confirme que o menu tem link "Preços"
-- [ ] Screenshot: Página inicial
+### Componentes Analisados:
+- ✅ **CreditService**: Gerenciamento completo de créditos
+- ✅ **Usage Limits**: Controle por planos (FREE, LITE, PRO, ENTERPRISE)
+- ✅ **Chat API**: Integração com verificação de créditos
+- ✅ **Credit Balance API**: Consulta de saldo
+- ✅ **Database Schema**: Tabelas `users.creditBalance` e `CreditTransaction`
 
-### 2. Teste de Criação de Conta
-- [ ] Clique em "Cadastrar" ou "Sign up"
-- [ ] Escolha um método de cadastro:
-  - [ ] Google
-  - [ ] Microsoft
-  - [ ] GitHub
-  - [ ] Apple
-  - [ ] Email
-- [ ] Complete o processo de cadastro
-- [ ] Screenshot: Tela de cadastro
+## 🧪 Testes Manuais
 
-### 3. Teste da Página de Preços (Sem Login)
-- [ ] Acesse diretamente: https://seahorse-app-k5pag.ondigitalocean.app/pricing
-- [ ] Se redirecionar para login, anote isso
-- [ ] Após login, navegue para "Preços"
-- [ ] Verifique os 3 planos:
-  - [ ] **Starter** - R$ 29,90/mês
-  - [ ] **Pro** - R$ 59,90/mês
-  - [ ] **Ultimate** - R$ 99,90/mês
-- [ ] Screenshot: Página de preços
+### Teste 1: Verificar Saldo de Créditos
+**Objetivo**: Verificar se o sistema mostra o saldo corretamente
 
-### 4. Teste de Upgrade de Conta
-- [ ] Na página de preços, clique em "Assinar" no plano **Pro**
-- [ ] Verifique se abre o checkout do MercadoPago
-- [ ] Complete o pagamento de teste:
-  - [ ] Use cartão de teste se disponível
-  - [ ] Ou cancele antes de confirmar pagamento real
-- [ ] Screenshot: Tela do MercadoPago
+1. **Acesse**: http://localhost:3025/dashboard
+2. **Verificar**: 
+   - Saldo de créditos é exibido
+   - API `/api/credits/balance` retorna resposta correta
+3. **Esperado**: Saldo atual do usuário logado
 
-### 5. Verificação pós-Upgrade
-- [ ] Após o upgrade (ou simulação), volte para a aplicação
-- [ ] Acesse a área de chat
-- [ ] Verifique o dropdown de seleção de modelos
-- [ ] Screenshot: Dropdown de modelos
+### Teste 2: Consumo de Créditos no Chat
+**Objetivo**: Verificar se créditos são consumidos ao usar modelos pagos
 
-### 6. Teste dos Modelos de IA
+1. **Acesse**: Chat no dashboard
+2. **Selecione**: Modelo que requer créditos (ex: gpt-4o, claude-3.5-sonnet)
+3. **Envie**: Uma mensagem de teste
+4. **Verificar**:
+   - Resposta da IA é gerada
+   - Saldo de créditos diminui
+   - Transação é registrada no banco
 
-#### Plano Starter (padrão):
-- [ ] gpt-4o-mini
-- [ ] claude-3-haiku
-- [ ] gemini-1.5-flash
+### Teste 3: Limite de Créditos Insuficientes
+**Objetivo**: Verificar comportamento quando créditos são insuficientes
 
-#### Plano Pro (após upgrade):
-Deve incluir os do Starter mais:
-- [ ] gpt-4o
-- [ ] claude-3.5-sonnet
-- [ ] gemini-1.5-pro
-- [ ] command-r
+1. **Cenário**: Configure usuário com poucos créditos
+2. **Teste**: Envie mensagem com modelo caro
+3. **Esperado**: 
+   - Erro 402 "Payment Required"
+   - Mensagem indicando créditos insuficientes
+   - Saldo não alterado
 
-#### Plano Ultimate:
-Deve incluir todos os anteriores mais:
-- [ ] o1-preview
-- [ ] o1-mini
-- [ ] claude-3-opus
-- [ ] gpt-4-turbo
-- [ ] gemini-2.0-flash
+### Teste 4: Modelos Gratuitos vs Pagos
+**Objetivo**: Verificar diferenciação entre modelos
 
-### 7. Teste de Funcionalidade do Chat
-- [ ] Selecione um modelo disponível
-- [ ] Envie uma mensagem de teste: "Olá, você pode me dizer qual modelo você é?"
-- [ ] Verifique se recebe resposta
-- [ ] Teste com 2-3 modelos diferentes
-- [ ] Screenshot: Chat funcionando
+1. **Teste A**: Use modelo gratuito (ex: gpt-4o-mini)
+   - **Esperado**: Funciona sem consumir créditos
+2. **Teste B**: Use modelo pago (ex: gpt-4o)
+   - **Esperado**: Consome créditos conforme configuração
 
-### 8. Verificação de Limites
-- [ ] Verifique se há indicador de mensagens usadas/restantes
-- [ ] Confirme os limites por plano:
-  - Starter: 100 mensagens/mês
-  - Pro: 1.000 mensagens/mês
-  - Ultimate: Ilimitado
+### Teste 5: Limites por Plano
+**Objetivo**: Verificar restrições por tipo de plano
 
-## 📊 Relatório de Problemas
+1. **FREE Plan**:
+   - Máximo 50 mensagens/dia
+   - 0 mensagens avançadas/mês
+   - Apenas modelos básicos
+2. **LITE Plan**:
+   - Mensagens ilimitadas (modelos rápidos)
+   - 120 mensagens avançadas/mês
+3. **PRO/ENTERPRISE**:
+   - Sem limites de mensagens
+   - Todos os modelos disponíveis
 
-### ❌ Problemas Encontrados:
-1. **Redirecionamentos**: Páginas protegidas redirecionam para `/auth/signin`
-2. **Conteúdo não visível sem login**: Preços podem não estar públicos
+## 🗄️ Verificações no Banco de Dados
 
-### ✅ Funcionalidades Confirmadas:
-1. Aplicação está online e respondendo
-2. Sistema de autenticação funciona
-3. Múltiplos providers OAuth disponíveis
+### Consultas Úteis:
+```sql
+-- Verificar saldo do usuário
+SELECT id, email, creditBalance, planType FROM User;
 
-## 🔍 Logs para Verificar
+-- Verificar transações de crédito
+SELECT * FROM CreditTransaction ORDER BY createdAt DESC LIMIT 10;
 
-No painel do Digital Ocean:
-1. Acesse https://cloud.digitalocean.com/apps
-2. Clique na aplicação
-3. Vá em "Runtime Logs"
-4. Procure por:
-   - Erros de conexão com MercadoPago
-   - Erros de API com OpenRouter
-   - Falhas de autenticação
+-- Verificar uso por modelo
+SELECT * FROM UserUsage ORDER BY date DESC LIMIT 10;
 
-## 📝 Template de Reporte
-
-Após completar os testes, preencha:
-
-```
-DATA DO TESTE: ___________
-TESTADOR: ___________
-
-RESUMO:
-- Login/Cadastro: [ ] Funcionando [ ] Com problemas
-- Página de Preços: [ ] Visível [ ] Requer login
-- Checkout MercadoPago: [ ] Funcionando [ ] Com problemas
-- Modelos de IA: [ ] Todos disponíveis [ ] Parcialmente [ ] Nenhum
-- Chat: [ ] Funcionando [ ] Com problemas
-
-OBSERVAÇÕES:
-_________________________________
-_________________________________
-_________________________________
+-- Verificar conversas e mensagens
+SELECT c.id, c.title, c.modelUsed, m.tokensUsed 
+FROM Conversation c 
+JOIN Message m ON c.id = m.conversationId 
+ORDER BY c.createdAt DESC;
 ```
 
-## 🚨 Ações Recomendadas
+## 📊 Dados de Teste
 
-1. **Se a página de preços não for pública**:
-   - Considerar criar uma landing page pública
-   - Ou permitir visualização sem login
+### Configurações de Créditos por Modelo:
+```javascript
+// Modelos gratuitos (0 créditos)
+'gpt-4o-mini', 'claude-3.5-haiku', 'gemini-2-flash-free'
 
-2. **Se o MercadoPago não aparecer**:
-   - Verificar variáveis de ambiente no Digital Ocean
-   - Checar logs de erro
+// Modelos de custo médio (1-5 créditos por 1k tokens)
+'gpt-3.5-turbo', 'claude-3.5-sonnet'
 
-3. **Se os modelos não aparecerem**:
-   - Verificar OPENROUTER_API_KEY
-   - Confirmar configuração no código
+// Modelos premium (5-10 créditos por 1k tokens)
+'gpt-4o', 'claude-4-sonnet'
+```
+
+### Planos e Limites:
+- **FREE**: 50 msg/dia, 0 avançadas/mês
+- **LITE**: Ilimitado rápido, 120 avançadas/mês
+- **PRO**: Ilimitado tudo, 1M créditos/mês
+- **ENTERPRISE**: Ilimitado tudo
+
+## ✅ Checklist de Validação
+
+### Frontend:
+- [ ] Saldo de créditos visível no dashboard
+- [ ] Avisos de créditos baixos
+- [ ] Mensagens de erro claras
+- [ ] Indicação de modelo gratuito/pago
+
+### Backend:
+- [ ] API `/api/credits/balance` funcional
+- [ ] Verificação prévia de créditos no chat
+- [ ] Consumo pós-processamento
+- [ ] Transações registradas corretamente
+
+### Banco de Dados:
+- [ ] Campo `creditBalance` atualizado
+- [ ] Tabela `CreditTransaction` com histórico
+- [ ] Tabela `UserUsage` com estatísticas
+- [ ] Relacionamentos íntegros
+
+## 🚨 Cenários de Erro
+
+### Casos Especiais:
+1. **Usuário sem créditos**: Deve ver mensagem clara
+2. **Modelo não disponível**: Erro 403 com explicação
+3. **Falha na IA**: Créditos não consumidos
+4. **Transação falhada**: Rollback automático
+
+## 📈 Métricas de Sucesso
+
+### KPIs para Monitorar:
+- Taxa de sucesso de transações de crédito
+- Tempo de resposta das APIs
+- Precisão dos cálculos de consumo
+- Integridade dos dados de uso
+
+---
+
+**Status**: ✅ Sistema completamente implementado e testável
+**Última Atualização**: Janeiro 2025

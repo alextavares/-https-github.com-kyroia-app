@@ -396,11 +396,7 @@ export class AnalyticsService {
   }
 }
 
-export { AnalyticsService, AnalyticsPeriodSchema, AnalyticsQuerySchema }
+/* removed duplicate re-exports to avoid conflicts */
 export type { 
-  UserAnalytics, 
-  SystemAnalytics, 
-  ModelUsage, 
-  FeatureUsage, 
-  UsageTrend 
+/* removed duplicate re-exports to avoid conflicts */
 }

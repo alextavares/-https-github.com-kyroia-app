@@ -160,7 +160,7 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
       {/* Input Area */}
       <div className="border-t border-border p-4">
         <div className="flex items-center space-x-2 mb-2">
-          <span className="text-sm text-muted-foreground">Pergunte para Inner AI</span>
+          <span className="text-sm text-muted-foreground">Pergunte para Kyroia</span>
           <Button 
             variant="ghost" 
             size="sm" 

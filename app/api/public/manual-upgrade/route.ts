@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { PaymentStatus } from '@/lib/constants/payment-status'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
       paymentId,
       planType,
       originalPlan: user.planType,
-      steps: []
+      steps: [] as any[]
     }
     
     // Step 1: Update user plan
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
         data: { planType: planType.toUpperCase() as any }
       })
       results.steps.push({ step: 'user_update', status: 'success' })
-    } catch (error) {
+    } catch (error: any) {
       results.steps.push({ step: 'user_update', status: 'error', error: error.message })
       throw error
     }
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
         }
       })
       results.steps.push({ step: 'subscription_create', status: 'success' })
-    } catch (error) {
+    } catch (error: any) {
       results.steps.push({ step: 'subscription_create', status: 'error', error: error.message })
       // Don't throw - continue with payment record
     }
@@ -73,12 +74,12 @@ export async function POST(request: NextRequest) {
           userId,
           amount: planType.toUpperCase() === 'PRO' ? 99.90 : 49.90,
           currency: 'BRL',
-          status: 'COMPLETED',
+          status: PaymentStatus.COMPLETED,
           mercadoPagoPaymentId: paymentId
         }
       })
       results.steps.push({ step: 'payment_record', status: 'success' })
-    } catch (error) {
+    } catch (error: any) {
       results.steps.push({ step: 'payment_record', status: 'error', error: error.message })
       // Don't throw - upgrade already complete
     }
@@ -90,11 +91,11 @@ export async function POST(request: NextRequest) {
     })
     
     results.finalUser = updatedUser
-    results.success = updatedUser.planType === planType.toUpperCase()
+    results.success = updatedUser?.planType === planType.toUpperCase()
     
     return NextResponse.json(results, { status: 200 })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Manual upgrade error:', error)
     return NextResponse.json({ 
       error: error.message,

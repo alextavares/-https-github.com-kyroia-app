@@ -18,8 +18,8 @@ const nextConfig: NextConfig = {
   // Add performance and security optimizations
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
-    // Enable webpack build cache for faster builds
-    webpackBuildWorker: true,
+    // Disable turbopack/hmr noisy features in dev to avoid chunk load errors
+    webpackBuildWorker: false,
   },
   
   // Image optimization settings

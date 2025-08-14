@@ -1,5 +1,5 @@
 // Este arquivo contém as definições de cores e variáveis CSS para os temas
-// Baseado nas cores do Inner AI:
+// Baseado nas cores do Kyroia:
 // - Primary: #8B5CF6 (roxo vibrante)
 // - Secondary: #3B82F6 (azul)
 // - Accent: #10B981 (verde)

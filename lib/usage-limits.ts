@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { PlanType } from '@prisma/client'
+export type PlanType = 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'
 
 export interface UsageLimits {
   dailyMessages: number | null
@@ -172,6 +172,8 @@ export function getModelType(model: string): 'fast' | 'advanced' | null {
 }
 
 export async function checkUsageLimits(userId: string, model?: string) {
+  // Some deployments don't have the userUsage table. Guard for that.
+  const userUsageDelegate: any = (prisma as unknown as { userUsage?: any }).userUsage
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { planType: true },
@@ -181,7 +183,7 @@ export async function checkUsageLimits(userId: string, model?: string) {
     throw new Error('User not found')
   }
 
-  const limits = PLAN_LIMITS[user.planType]
+  const limits = PLAN_LIMITS[user.planType as PlanType]
   
   // Check model access
   if (model) {
@@ -199,39 +201,39 @@ export async function checkUsageLimits(userId: string, model?: string) {
     
     // For advanced models, check monthly limit for FREE plan
     if (isAdvancedModel && user.planType === 'FREE' && limits.monthlyAdvancedMessages !== null) {
-      const startOfMonth = new Date()
-      startOfMonth.setDate(1)
-      startOfMonth.setHours(0, 0, 0, 0)
-      
-      const monthlyAdvancedUsage = await prisma.userUsage.aggregate({
-        where: {
-          userId,
-          date: {
-            gte: startOfMonth,
-          },
-          // Temporarily check modelId directly since foreign key is removed
-          modelId: {
-            in: limits.modelsAllowed.advanced
-          }
-        },
-        _sum: {
-          messagesCount: true,
-        },
-      })
-
-      const advancedMessagesUsed = monthlyAdvancedUsage._sum.messagesCount || 0
-      
-      if (advancedMessagesUsed >= limits.monthlyAdvancedMessages) {
-        return {
-          allowed: false,
-          reason: `Monthly advanced messages limit reached (${advancedMessagesUsed}/${limits.monthlyAdvancedMessages})`,
-          planType: user.planType,
-          usage: {
-            monthlyAdvancedMessages: {
-              used: advancedMessagesUsed,
-              limit: limits.monthlyAdvancedMessages,
+      if (userUsageDelegate?.aggregate) {
+        const startOfMonth = new Date()
+        startOfMonth.setDate(1)
+        startOfMonth.setHours(0, 0, 0, 0)
+        
+        const monthlyAdvancedUsage = await userUsageDelegate.aggregate({
+          where: {
+            userId,
+            date: {
+              gte: startOfMonth,
             },
+            modelId: {
+              in: limits.modelsAllowed.advanced
+            }
           },
+          _sum: {
+            messagesCount: true,
+          },
+        })
+        const advancedMessagesUsed = monthlyAdvancedUsage._sum.messagesCount || 0
+      
+        if (advancedMessagesUsed >= limits.monthlyAdvancedMessages) {
+          return {
+            allowed: false,
+            reason: `Monthly advanced messages limit reached (${advancedMessagesUsed}/${limits.monthlyAdvancedMessages})`,
+            planType: user.planType,
+            usage: {
+              monthlyAdvancedMessages: {
+                used: advancedMessagesUsed,
+                limit: limits.monthlyAdvancedMessages,
+              },
+            },
+          }
         }
       }
     }
@@ -239,76 +241,79 @@ export async function checkUsageLimits(userId: string, model?: string) {
 
   // Check daily message limit
   if (limits.dailyMessages !== null) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const todayUsage = await prisma.userUsage.aggregate({
-      where: {
-        userId,
-        date: {
-          gte: today,
-          lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-        },
-      },
-      _sum: {
-        messagesCount: true,
-      },
-    })
-
-    const messagesUsed = todayUsage._sum.messagesCount || 0
-    
-    if (messagesUsed >= limits.dailyMessages) {
-      return {
-        allowed: false,
-        reason: `Daily message limit reached (${messagesUsed}/${limits.dailyMessages})`,
-        planType: user.planType,
-        usage: {
-          dailyMessages: {
-            used: messagesUsed,
-            limit: limits.dailyMessages,
+    if (userUsageDelegate?.aggregate) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      const todayUsage = await userUsageDelegate.aggregate({
+        where: {
+          userId,
+          date: {
+            gte: today,
+            lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
           },
         },
+        _sum: {
+          messagesCount: true,
+        },
+      })
+  
+      const messagesUsed = todayUsage._sum.messagesCount || 0
+    
+      if (messagesUsed >= limits.dailyMessages) {
+        return {
+          allowed: false,
+          reason: `Daily message limit reached (${messagesUsed}/${limits.dailyMessages})`,
+          planType: user.planType,
+          usage: {
+            dailyMessages: {
+              used: messagesUsed,
+              limit: limits.dailyMessages,
+            },
+          },
+        }
       }
     }
   }
 
   // Check monthly token limit
   if (limits.monthlyTokens !== null) {
-    const startOfMonth = new Date()
-    startOfMonth.setDate(1)
-    startOfMonth.setHours(0, 0, 0, 0)
-    
-    const monthlyUsage = await prisma.userUsage.aggregate({
-      where: {
-        userId,
-        date: {
-          gte: startOfMonth,
-        },
-      },
-      _sum: {
-        inputTokensUsed: true,
-        outputTokensUsed: true,
-      },
-    })
-
-    const tokensUsed = (monthlyUsage._sum.inputTokensUsed || 0) + 
-                       (monthlyUsage._sum.outputTokensUsed || 0)
-    
-    if (tokensUsed >= limits.monthlyTokens) {
-      return {
-        allowed: false,
-        reason: `Monthly token limit reached (${tokensUsed.toLocaleString()}/${limits.monthlyTokens.toLocaleString()})`,
-        planType: user.planType,
-        usage: {
-          monthlyTokens: {
-            used: tokensUsed,
-            limit: limits.monthlyTokens,
+    if (userUsageDelegate?.aggregate) {
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+      
+      const monthlyUsage = await userUsageDelegate.aggregate({
+        where: {
+          userId,
+          date: {
+            gte: startOfMonth,
           },
         },
+        _sum: {
+          inputTokensUsed: true,
+          outputTokensUsed: true,
+        },
+      })
+
+      const tokensUsed = (monthlyUsage._sum.inputTokensUsed || 0) + 
+                         (monthlyUsage._sum.outputTokensUsed || 0)
+    
+      if (tokensUsed >= limits.monthlyTokens) {
+        return {
+          allowed: false,
+          reason: `Monthly token limit reached (${tokensUsed.toLocaleString()}/${limits.monthlyTokens.toLocaleString()})`,
+          planType: user.planType,
+          usage: {
+            monthlyTokens: {
+              used: tokensUsed,
+              limit: limits.monthlyTokens,
+            },
+          },
+        }
       }
     }
-  }
-
+    }
   return {
     allowed: true,
     planType: user.planType,
@@ -322,11 +327,16 @@ export async function trackUsage(
   tokensUsed: { input: number; output: number },
   cost: number
 ) {
+  const userUsageDelegate: any = (prisma as unknown as { userUsage?: any }).userUsage
+  if (!userUsageDelegate?.upsert) {
+    // Usage tracking disabled when table is not available
+    return
+  }
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
   // Use upsert for a more atomic and potentially efficient operation
-  await prisma.userUsage.upsert({
+  await userUsageDelegate.upsert({
     where: {
       // This relies on the @@unique([userId, modelId, date]) constraint in schema.prisma
       userId_modelId_date: {
@@ -354,6 +364,7 @@ export async function trackUsage(
 }
 
 export async function getUserUsageStats(userId: string) {
+  const userUsageDelegate: any = (prisma as unknown as { userUsage?: any }).userUsage
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   
@@ -363,7 +374,7 @@ export async function getUserUsageStats(userId: string) {
 
   try {
     const [dailyUsage, monthlyUsage, user] = await Promise.all([
-      prisma.userUsage.aggregate({
+      userUsageDelegate?.aggregate ? userUsageDelegate.aggregate({
         where: {
           userId,
           date: {
@@ -377,8 +388,8 @@ export async function getUserUsageStats(userId: string) {
           outputTokensUsed: true,
           costIncurred: true,
         },
-      }),
-      prisma.userUsage.aggregate({
+      }) : { _sum: { messagesCount: 0, inputTokensUsed: 0, outputTokensUsed: 0, costIncurred: 0 } },
+      userUsageDelegate?.aggregate ? userUsageDelegate.aggregate({
         where: {
           userId,
           date: {
@@ -391,7 +402,7 @@ export async function getUserUsageStats(userId: string) {
           outputTokensUsed: true,
           costIncurred: true,
         },
-      }),
+      }) : { _sum: { messagesCount: 0, inputTokensUsed: 0, outputTokensUsed: 0, costIncurred: 0 } },
       prisma.user.findUnique({
         where: { id: userId },
         select: { planType: true },
@@ -434,14 +445,14 @@ export async function getUserUsageStats(userId: string) {
       }
     }
 
-    const limits = PLAN_LIMITS[user.planType]
+    const limits = PLAN_LIMITS[user.planType as PlanType]
     const dailyMessages = dailyUsage._sum.messagesCount || 0
     const monthlyTokens = (monthlyUsage._sum.inputTokensUsed || 0) + 
                           (monthlyUsage._sum.outputTokensUsed || 0)
     const monthlyCost = monthlyUsage._sum.costIncurred || 0
 
     // Calculate advanced messages used for FREE plan
-    const monthlyAdvancedMessages = user.planType === 'FREE' ? await prisma.userUsage.aggregate({
+    const monthlyAdvancedMessages = user.planType === 'FREE' && userUsageDelegate?.aggregate ? await userUsageDelegate.aggregate({
       where: {
         userId,
         date: {

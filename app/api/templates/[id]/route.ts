@@ -1,59 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { NextRequest } from 'next/server'
+import { z } from 'zod'
+import { NotFound, BadRequest } from '@/lib/http/errors'
+import { requireAuth } from '@/lib/auth/guards'
+import { validateWith } from '@/lib/validation/zod-helpers'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      )
-    }
+// Padronização: não existe modelo Template no Prisma atual.
+// Responderemos NotFound de forma consistente, com autenticação e validação.
 
-    const template = await prisma.promptTemplate.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        category: true,
-        templateContent: true,
-        isPublic: true,
-        usageCount: true,
-        createdAt: true,
-        createdBy: true,
-      }
-    })
+const paramsSchema = z.object({
+  id: z.string().min(1, 'id é obrigatório'),
+})
 
-    if (!template) {
-      return NextResponse.json(
-        { error: 'Template não encontrado' },
-        { status: 404 }
-      )
-    }
+export async function GET(_req: NextRequest, context: { params: unknown }) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.error
 
-    // Verifica se o usuário tem permissão para ver o template
-    if (!template.isPublic && template.createdBy !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Sem permissão para acessar este template' },
-        { status: 403 }
-      )
-    }
+  const parsed = await validateWith(paramsSchema, context?.params ?? {})
+  if (parsed instanceof Response) return parsed
 
-    return NextResponse.json(template)
-  } catch (error) {
-    console.error('Error fetching template:', error)
-    return NextResponse.json(
-      { error: 'Erro ao buscar template' },
-      { status: 500 }
-    )
-  }
+  return NotFound('Template não disponível neste ambiente')
+}
+
+export async function DELETE(_req: NextRequest, context: { params: unknown }) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.error
+
+  const parsed = await validateWith(paramsSchema, context?.params ?? {})
+  if (parsed instanceof Response) return parsed
+
+  return NotFound('Template não disponível neste ambiente')
 }
