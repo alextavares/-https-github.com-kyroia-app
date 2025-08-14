@@ -1,0 +1,40 @@
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+async function updateUserPlan(email, planType) {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { email }
+        });
+        if (!user) {
+            console.error(`❌ User with email ${email} not found`);
+            return;
+        }
+        const updatedUser = await prisma.user.update({
+            where: { email },
+            data: { planType }
+        });
+        console.log(`✅ Updated user ${email} to plan ${planType}`);
+        console.log(`   Current plan: ${updatedUser.planType}`);
+    }
+    catch (error) {
+        console.error('❌ Error updating user plan:', error);
+    }
+    finally {
+        await prisma.$disconnect();
+    }
+}
+// Get arguments from command line
+const email = process.argv[2];
+const plan = process.argv[3];
+if (!email || !plan) {
+    console.log('Usage: npx tsx scripts/update-user-plan.ts <email> <plan>');
+    console.log('Plans: FREE, PRO, ENTERPRISE');
+    console.log('Example: npx tsx scripts/update-user-plan.ts test@example.com PRO');
+    process.exit(1);
+}
+if (!['FREE', 'PRO', 'ENTERPRISE'].includes(plan)) {
+    console.error('❌ Invalid plan. Must be FREE, PRO, or ENTERPRISE');
+    process.exit(1);
+}
+updateUserPlan(email, plan);
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoidXBkYXRlLXVzZXItcGxhbi5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbInVwZGF0ZS11c2VyLXBsYW4udHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUEsT0FBTyxFQUFFLFlBQVksRUFBWSxNQUFNLGdCQUFnQixDQUFBO0FBRXZELE1BQU0sTUFBTSxHQUFHLElBQUksWUFBWSxFQUFFLENBQUE7QUFFakMsS0FBSyxVQUFVLGNBQWMsQ0FBQyxLQUFhLEVBQUUsUUFBa0I7SUFDN0QsSUFBSSxDQUFDO1FBQ0gsTUFBTSxJQUFJLEdBQUcsTUFBTSxNQUFNLENBQUMsSUFBSSxDQUFDLFVBQVUsQ0FBQztZQUN4QyxLQUFLLEVBQUUsRUFBRSxLQUFLLEVBQUU7U0FDakIsQ0FBQyxDQUFBO1FBRUYsSUFBSSxDQUFDLElBQUksRUFBRSxDQUFDO1lBQ1YsT0FBTyxDQUFDLEtBQUssQ0FBQyxxQkFBcUIsS0FBSyxZQUFZLENBQUMsQ0FBQTtZQUNyRCxPQUFNO1FBQ1IsQ0FBQztRQUVELE1BQU0sV0FBVyxHQUFHLE1BQU0sTUFBTSxDQUFDLElBQUksQ0FBQyxNQUFNLENBQUM7WUFDM0MsS0FBSyxFQUFFLEVBQUUsS0FBSyxFQUFFO1lBQ2hCLElBQUksRUFBRSxFQUFFLFFBQVEsRUFBRTtTQUNuQixDQUFDLENBQUE7UUFFRixPQUFPLENBQUMsR0FBRyxDQUFDLGtCQUFrQixLQUFLLFlBQVksUUFBUSxFQUFFLENBQUMsQ0FBQTtRQUMxRCxPQUFPLENBQUMsR0FBRyxDQUFDLG9CQUFvQixXQUFXLENBQUMsUUFBUSxFQUFFLENBQUMsQ0FBQTtJQUV6RCxDQUFDO0lBQUMsT0FBTyxLQUFLLEVBQUUsQ0FBQztRQUNmLE9BQU8sQ0FBQyxLQUFLLENBQUMsNkJBQTZCLEVBQUUsS0FBSyxDQUFDLENBQUE7SUFDckQsQ0FBQztZQUFTLENBQUM7UUFDVCxNQUFNLE1BQU0sQ0FBQyxXQUFXLEVBQUUsQ0FBQTtJQUM1QixDQUFDO0FBQ0gsQ0FBQztBQUVELGtDQUFrQztBQUNsQyxNQUFNLEtBQUssR0FBRyxPQUFPLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxDQUFBO0FBQzdCLE1BQU0sSUFBSSxHQUFHLE9BQU8sQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFhLENBQUE7QUFFeEMsSUFBSSxDQUFDLEtBQUssSUFBSSxDQUFDLElBQUksRUFBRSxDQUFDO0lBQ3BCLE9BQU8sQ0FBQyxHQUFHLENBQUMsMkRBQTJELENBQUMsQ0FBQTtJQUN4RSxPQUFPLENBQUMsR0FBRyxDQUFDLDhCQUE4QixDQUFDLENBQUE7SUFDM0MsT0FBTyxDQUFDLEdBQUcsQ0FBQyxtRUFBbUUsQ0FBQyxDQUFBO0lBQ2hGLE9BQU8sQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFDLENBQUE7QUFDakIsQ0FBQztBQUVELElBQUksQ0FBQyxDQUFDLE1BQU0sRUFBRSxLQUFLLEVBQUUsWUFBWSxDQUFDLENBQUMsUUFBUSxDQUFDLElBQUksQ0FBQyxFQUFFLENBQUM7SUFDbEQsT0FBTyxDQUFDLEtBQUssQ0FBQyxrREFBa0QsQ0FBQyxDQUFBO0lBQ2pFLE9BQU8sQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFDLENBQUE7QUFDakIsQ0FBQztBQUVELGNBQWMsQ0FBQyxLQUFLLEVBQUUsSUFBSSxDQUFDLENBQUEifQ==

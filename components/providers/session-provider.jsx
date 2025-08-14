@@ -1,0 +1,6 @@
+"use client";
+import { SessionProvider } from "next-auth/react";
+export default function SessionProviderWrapper({ children }) {
+    return <SessionProvider>{children}</SessionProvider>;
+}
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoic2Vzc2lvbi1wcm92aWRlci5qc3giLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJzZXNzaW9uLXByb3ZpZGVyLnRzeCJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQSxZQUFZLENBQUE7QUFFWixPQUFPLEVBQUUsZUFBZSxFQUFFLE1BQU0saUJBQWlCLENBQUE7QUFNakQsTUFBTSxDQUFDLE9BQU8sVUFBVSxzQkFBc0IsQ0FBQyxFQUFFLFFBQVEsRUFBK0I7SUFDdEYsT0FBTyxDQUFDLGVBQWUsQ0FBQyxDQUFDLFFBQVEsQ0FBQyxFQUFFLGVBQWUsQ0FBQyxDQUFBO0FBQ3RELENBQUMifQ==

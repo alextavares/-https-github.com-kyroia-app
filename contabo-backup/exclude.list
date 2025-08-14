@@ -1,0 +1,13 @@
+/proc
+/sys
+/dev
+/run
+/tmp
+/mnt
+/media
+/var/cache
+/var/tmp
+*.log
+*.swap
+
+

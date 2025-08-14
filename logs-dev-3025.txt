@@ -1,0 +1,56 @@
+
+> innerai-clone@0.1.0 dev:3025
+> next dev -p 3025 -H 0.0.0.0
+
+(node:123125) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/c/codigos/inneraiclone2/next.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /mnt/c/codigos/inneraiclone2/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+   ▲ Next.js 15.4.4
+   - Local:        http://localhost:3025
+   - Network:      http://0.0.0.0:3025
+   - Environments: .env.local, .env
+   - Experiments (use with caution):
+     ⨯ webpackBuildWorker
+     · optimizePackageImports
+
+ ✓ Starting...
+(node:123202) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/c/codigos/inneraiclone2/next.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /mnt/c/codigos/inneraiclone2/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ⚠ Duplicate page detected. app/api/debug/packages/route.js and app/api/debug/packages/route.ts resolve to /api/debug/packages
+ ⚠ Duplicate page detected. app/api/public/test-packages/route.js and app/api/public/test-packages/route.ts resolve to /api/public/test-packages
+ ⚠ Duplicate page detected. app/api/debug/packages/route.js and app/api/debug/packages/route.ts resolve to /api/debug/packages
+ ⚠ Duplicate page detected. app/api/public/test-packages/route.js and app/api/public/test-packages/route.ts resolve to /api/public/test-packages
+ ✓ Ready in 18.8s
+ ✓ Compiled /middleware in 374ms (153 modules)
+ ○ Compiling /api/mercadopago/dev-process ...
+ ✓ Compiled /api/mercadopago/dev-process in 2.9s (445 modules)
+ POST /api/mercadopago/dev-process 200 in 747ms
+ ✓ Compiled in 227ms (153 modules)
+ ⚠ Duplicate page detected. app/api/debug/packages/route.js and app/api/debug/packages/route.ts resolve to /api/debug/packages
+ ⚠ Duplicate page detected. app/api/public/test-packages/route.js and app/api/public/test-packages/route.ts resolve to /api/public/test-packages
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 9.8s (852 modules)
+ GET /api/mercadopago/webhook/logs 404 in 11660ms
+ ✓ Compiled in 1994ms (322 modules)
+ ✓ Compiled in 201ms (153 modules)
+ ⚠ Duplicate page detected. app/api/debug/packages/route.js and app/api/debug/packages/route.ts resolve to /api/debug/packages
+ ⚠ Duplicate page detected. app/api/public/test-packages/route.js and app/api/public/test-packages/route.ts resolve to /api/public/test-packages
+ GET /api/mercadopago/webhook-logs 404 in 203ms
+ ○ Compiling /api/mercadopago/dev-create-preference ...
+ ✓ Compiled /api/mercadopago/dev-create-preference in 633ms (564 modules)
+ POST /api/mercadopago/dev-create-preference 200 in 1873ms
+ POST /api/mercadopago/dev-create-preference 200 in 601ms
+ POST /api/mercadopago/dev-create-preference 200 in 495ms
+ POST /api/mercadopago/dev-create-preference 200 in 505ms
+ ✓ Compiled /api/mercadopago/dev-process in 207ms (259 modules)
+ POST /api/mercadopago/dev-process 200 in 1101ms
+ ✓ Compiled /_not-found in 308ms (530 modules)
+ GET /.identity 404 in 944ms
+ GET /.identity 404 in 99ms
+ GET /.identity 404 in 112ms
+ GET /.identity 404 in 302ms
+ GET /.identity 404 in 176ms
+ GET /.identity 404 in 197ms

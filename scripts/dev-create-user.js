@@ -1,0 +1,36 @@
+/* Dev helper to upsert a user for E2E/login tests */
+import 'dotenv/config';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+const prisma = new PrismaClient();
+async function main() {
+    const email = process.env.EMAIL || 'alexandretmoraes1@gmail.com';
+    const name = process.env.NAME || 'Alex Moraes';
+    const passwordPlain = process.env.PASSWORD || 'Y*mare2025';
+    const password = await bcrypt.hash(passwordPlain, 12);
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+        await prisma.user.update({
+            where: { email },
+            data: { name, password, onboardingCompleted: true },
+        });
+        console.log('Updated user:', email);
+    }
+    else {
+        const user = await prisma.user.create({
+            data: {
+                email,
+                name,
+                password,
+                creditBalance: 1000,
+                onboardingCompleted: true,
+                planType: 'FREE',
+            },
+        });
+        console.log('Created user:', user.email);
+    }
+}
+main()
+    .catch((e) => { console.error(e); process.exit(1); })
+    .finally(async () => { await prisma.$disconnect(); });
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZGV2LWNyZWF0ZS11c2VyLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiZGV2LWNyZWF0ZS11c2VyLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBLHFEQUFxRDtBQUNyRCxPQUFPLGVBQWUsQ0FBQTtBQUN0QixPQUFPLEVBQUUsWUFBWSxFQUFFLE1BQU0sZ0JBQWdCLENBQUE7QUFDN0MsT0FBTyxNQUFNLE1BQU0sVUFBVSxDQUFBO0FBRTdCLE1BQU0sTUFBTSxHQUFHLElBQUksWUFBWSxFQUFFLENBQUE7QUFFakMsS0FBSyxVQUFVLElBQUk7SUFDakIsTUFBTSxLQUFLLEdBQUcsT0FBTyxDQUFDLEdBQUcsQ0FBQyxLQUFLLElBQUksNkJBQTZCLENBQUE7SUFDaEUsTUFBTSxJQUFJLEdBQUcsT0FBTyxDQUFDLEdBQUcsQ0FBQyxJQUFJLElBQUksYUFBYSxDQUFBO0lBQzlDLE1BQU0sYUFBYSxHQUFHLE9BQU8sQ0FBQyxHQUFHLENBQUMsUUFBUSxJQUFJLFlBQVksQ0FBQTtJQUUxRCxNQUFNLFFBQVEsR0FBRyxNQUFNLE1BQU0sQ0FBQyxJQUFJLENBQUMsYUFBYSxFQUFFLEVBQUUsQ0FBQyxDQUFBO0lBRXJELE1BQU0sUUFBUSxHQUFHLE1BQU0sTUFBTSxDQUFDLElBQUksQ0FBQyxVQUFVLENBQUMsRUFBRSxLQUFLLEVBQUUsRUFBRSxLQUFLLEVBQUUsRUFBRSxDQUFDLENBQUE7SUFDbkUsSUFBSSxRQUFRLEVBQUUsQ0FBQztRQUNiLE1BQU0sTUFBTSxDQUFDLElBQUksQ0FBQyxNQUFNLENBQUM7WUFDdkIsS0FBSyxFQUFFLEVBQUUsS0FBSyxFQUFFO1lBQ2hCLElBQUksRUFBRSxFQUFFLElBQUksRUFBRSxRQUFRLEVBQUUsbUJBQW1CLEVBQUUsSUFBSSxFQUFFO1NBQ3BELENBQUMsQ0FBQTtRQUNGLE9BQU8sQ0FBQyxHQUFHLENBQUMsZUFBZSxFQUFFLEtBQUssQ0FBQyxDQUFBO0lBQ3JDLENBQUM7U0FBTSxDQUFDO1FBQ04sTUFBTSxJQUFJLEdBQUcsTUFBTSxNQUFNLENBQUMsSUFBSSxDQUFDLE1BQU0sQ0FBQztZQUNwQyxJQUFJLEVBQUU7Z0JBQ0osS0FBSztnQkFDTCxJQUFJO2dCQUNKLFFBQVE7Z0JBQ1IsYUFBYSxFQUFFLElBQUk7Z0JBQ25CLG1CQUFtQixFQUFFLElBQUk7Z0JBQ3pCLFFBQVEsRUFBRSxNQUFNO2FBQ2pCO1NBQ0YsQ0FBQyxDQUFBO1FBQ0YsT0FBTyxDQUFDLEdBQUcsQ0FBQyxlQUFlLEVBQUUsSUFBSSxDQUFDLEtBQUssQ0FBQyxDQUFBO0lBQzFDLENBQUM7QUFDSCxDQUFDO0FBRUQsSUFBSSxFQUFFO0tBQ0gsS0FBSyxDQUFDLENBQUMsQ0FBQyxFQUFFLEVBQUUsR0FBRyxPQUFPLENBQUMsS0FBSyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUMsT0FBTyxDQUFDLElBQUksQ0FBQyxDQUFDLENBQUMsQ0FBQSxDQUFDLENBQUMsQ0FBQztLQUNuRCxPQUFPLENBQUMsS0FBSyxJQUFJLEVBQUUsR0FBRyxNQUFNLE1BQU0sQ0FBQyxXQUFXLEVBQUUsQ0FBQSxDQUFDLENBQUMsQ0FBQyxDQUFBIn0=

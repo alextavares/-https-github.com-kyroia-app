@@ -1,0 +1,2 @@
+lib/credit-service.ts(125,11): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'Without<CreditTransactionCreateInput, CreditTransactionUncheckedCreateInput> & CreditTransactionUncheckedCreateInput'.
+lib/credit-service.ts(171,11): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'Without<CreditTransactionCreateInput, CreditTransactionUncheckedCreateInput> & CreditTransactionUncheckedCreateInput'.

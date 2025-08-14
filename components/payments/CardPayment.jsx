@@ -1,0 +1,75 @@
+"use client";
+import { useState } from "react";
+export default function CardPayment({ packageId }) {
+    const [cardToken, setCardToken] = useState("");
+    const [installments, setInstallments] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [response, setResponse] = useState(null);
+    async function handleSubmit(e) {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        setResponse(null);
+        try {
+            const res = await fetch("/api/payments/mp/checkout/card", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    packageId,
+                    amount: 0, // será calculado no backend
+                    cardToken,
+                    installments,
+                }),
+                cache: "no-store",
+            });
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || "Erro ao processar pagamento.");
+            }
+            const data = await res.json();
+            setResponse(data);
+        }
+        catch (err) {
+            setError(err instanceof Error ? err.message : "Erro desconhecido.");
+        }
+        finally {
+            setLoading(false);
+        }
+    }
+    if (response) {
+        return (<div className="space-y-2">
+        <p className="text-sm text-green-700">Pagamento enviado com sucesso!</p>
+        <p className="text-xs text-gray-500">
+          Referência: <strong>{response.externalReference}</strong>
+        </p>
+        {response.cardLast4 && (<p className="text-xs text-gray-500">
+            Cartão final: **** {response.cardLast4}
+          </p>)}
+      </div>);
+    }
+    return (<form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Token do Cartão (tokenizado pelo Mercado Pago)
+        </label>
+        <input type="text" required value={cardToken} onChange={(e) => setCardToken(e.target.value)} placeholder="tok_visa_1234..." className="w-full border rounded px-3 py-2 text-sm"/>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Parcelas</label>
+        <select value={installments} onChange={(e) => setInstallments(Number(e.target.value))} className="w-full border rounded px-3 py-2 text-sm">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (<option key={n} value={n}>
+              {n}x
+            </option>))}
+        </select>
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <button type="submit" disabled={loading} className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+        {loading ? "Processando..." : "Pagar com Cartão"}
+      </button>
+    </form>);
+}
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiQ2FyZFBheW1lbnQuanN4Iiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiQ2FyZFBheW1lbnQudHN4Il0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBLFlBQVksQ0FBQztBQUViLE9BQU8sRUFBRSxRQUFRLEVBQUUsTUFBTSxPQUFPLENBQUM7QUFxQmpDLE1BQU0sQ0FBQyxPQUFPLFVBQVUsV0FBVyxDQUFDLEVBQUUsU0FBUyxFQUFTO0lBQ3RELE1BQU0sQ0FBQyxTQUFTLEVBQUUsWUFBWSxDQUFDLEdBQUcsUUFBUSxDQUFDLEVBQUUsQ0FBQyxDQUFDO0lBQy9DLE1BQU0sQ0FBQyxZQUFZLEVBQUUsZUFBZSxDQUFDLEdBQUcsUUFBUSxDQUFDLENBQUMsQ0FBQyxDQUFDO0lBQ3BELE1BQU0sQ0FBQyxPQUFPLEVBQUUsVUFBVSxDQUFDLEdBQUcsUUFBUSxDQUFDLEtBQUssQ0FBQyxDQUFDO0lBQzlDLE1BQU0sQ0FBQyxLQUFLLEVBQUUsUUFBUSxDQUFDLEdBQUcsUUFBUSxDQUFnQixJQUFJLENBQUMsQ0FBQztJQUN4RCxNQUFNLENBQUMsUUFBUSxFQUFFLFdBQVcsQ0FBQyxHQUFHLFFBQVEsQ0FBc0IsSUFBSSxDQUFDLENBQUM7SUFFcEUsS0FBSyxVQUFVLFlBQVksQ0FBQyxDQUFrQjtRQUM1QyxDQUFDLENBQUMsY0FBYyxFQUFFLENBQUM7UUFDbkIsVUFBVSxDQUFDLElBQUksQ0FBQyxDQUFDO1FBQ2pCLFFBQVEsQ0FBQyxJQUFJLENBQUMsQ0FBQztRQUNmLFdBQVcsQ0FBQyxJQUFJLENBQUMsQ0FBQztRQUVsQixJQUFJLENBQUM7WUFDSCxNQUFNLEdBQUcsR0FBRyxNQUFNLEtBQUssQ0FBQyxnQ0FBZ0MsRUFBRTtnQkFDeEQsTUFBTSxFQUFFLE1BQU07Z0JBQ2QsT0FBTyxFQUFFLEVBQUUsY0FBYyxFQUFFLGtCQUFrQixFQUFFO2dCQUMvQyxJQUFJLEVBQUUsSUFBSSxDQUFDLFNBQVMsQ0FBQztvQkFDbkIsU0FBUztvQkFDVCxNQUFNLEVBQUUsQ0FBQyxF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

@@ -1,0 +1,50 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": [
+    "app/api/**/*.ts",
+    "app/api/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "services/**/*.ts",
+    "types/**/*.ts",
+    "types/**/*.d.ts",
+    "next-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "tests/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "playwright-report/**/*",
+    "scripts/**/*",
+    "app/api/admin/**/*",
+    "app/api/debug/**/*",
+    "app/api/debug-usage/**/*",
+    "app/api/debug-user/**/*",
+    "app/api/public/**/*",
+    "app/api/test-*/**/*",
+    "app/api/test/**/*",
+    "app/api/test-ai*/**/*",
+    "app/api/test-webhook/**/*",
+    "app/api/test-stream-public/**/*",
+    "app/api/public-test-chat/**/*",
+    "app/api/stripe/mock-checkout/**/*",
+    "app/api/mercadopago/subscription/**/*",
+    "app/api/knowledge/**/*",
+    "app/api/knowledge/**/*",
+    "app/api/models/usage/**/*",
+    "app/api/payments/mp/checkout/**/*",
+    "app/api/mercadopago/**/*",
+    "app/api/stripe/**/*",
+    "app/api/profile/**/*",
+    "app/api/templates/**/*",
+    "app/api/user/**/*",
+    "app/api/onboarding/**/*",
+    "lib/credit-service.ts",
+    "lib/subscription-service.ts"
+  ]
+}

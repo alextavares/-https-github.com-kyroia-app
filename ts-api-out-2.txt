@@ -1,0 +1,21 @@
+app/api/onboarding/route.ts(32,9): error TS2353: Object literal may only specify known properties, and 'phone' does not exist in type '(Without<UserUpdateInput, UserUncheckedUpdateInput> & UserUncheckedUpdateInput) | (Without<...> & UserUpdateInput)'.
+app/api/onboarding/route.ts(77,9): error TS2353: Object literal may only specify known properties, and 'phone' does not exist in type 'UserSelect<DefaultArgs>'.
+app/api/user/export-data/route.ts(56,41): error TS2339: Property 'messages' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; userId: string; title: string | null; modelUsed: string | null; isArchived: boolean; }'.
+app/api/user/export-data/route.ts(56,58): error TS2339: Property 'messages' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; userId: string; title: string | null; modelUsed: string | null; isArchived: boolean; }'.
+lib/ai/openai-provider.ts(175,9): error TS2769: No overload matches this call.
+  Overload 3 of 3, '(body: ChatCompletionCreateParamsBase, options?: RequestOptions<unknown> | undefined): APIPromise<ChatCompletion | Stream<...>>', gave the following error.
+    Type '({ role: any; content: string; } | { role: any; content: { type: "text" | "image_url"; text?: string | undefined; image_url?: { url: string; } | undefined; }[]; })[]' is not assignable to type 'ChatCompletionMessageParam[]'.
+      Type '{ role: any; content: string; } | { role: any; content: { type: "text" | "image_url"; text?: string | undefined; image_url?: { url: string; } | undefined; }[]; }' is not assignable to type 'ChatCompletionMessageParam'.
+        Type '{ role: any; content: { type: "text" | "image_url"; text?: string; image_url?: { url: string; }; }[]; }' is not assignable to type 'ChatCompletionMessageParam'.
+          Property 'name' is missing in type '{ role: any; content: { type: "text" | "image_url"; text?: string; image_url?: { url: string; }; }[]; }' but required in type 'ChatCompletionFunctionMessageParam'.
+lib/ai/providers.ts(2,10): error TS2305: Module '"ai"' has no exported member 'OpenAIStream'.
+lib/ai/providers.ts(2,24): error TS2305: Module '"ai"' has no exported member 'StreamingTextResponse'.
+lib/auth-simple.ts(26,30): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; name: string | null; email: string; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+lib/auth-simple.ts(32,18): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; name: string | null; email: string; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+lib/credit-service.ts(125,11): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'Without<CreditTransactionCreateInput, CreditTransactionUncheckedCreateInput> & CreditTransactionUncheckedCreateInput'.
+lib/credit-service.ts(171,11): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'Without<CreditTransactionCreateInput, CreditTransactionUncheckedCreateInput> & CreditTransactionUncheckedCreateInput'.
+lib/subscription-service.ts(3,10): error TS2724: '"@prisma/client"' has no exported member named 'SubscriptionStatus'. Did you mean 'Subscription'?
+lib/subscription-service.ts(43,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+lib/subscription-service.ts(69,9): error TS2353: Object literal may only specify known properties, and 'expiresAt' does not exist in type '(Without<SubscriptionUpdateInput, SubscriptionUncheckedUpdateInput> & SubscriptionUncheckedUpdateInput) | (Without<...> & SubscriptionUpdateInput)'.
+lib/subscription-service.ts(74,9): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type 'Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput'.

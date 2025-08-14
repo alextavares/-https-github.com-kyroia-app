@@ -1,0 +1,80 @@
+"use client";
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { Controller, FormProvider, useFormContext, } from "react-hook-form";
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+const Form = FormProvider;
+const FormFieldContext = React.createContext({});
+const FormField = (_a) => {
+    var props = __rest(_a, []);
+    return (<FormFieldContext.Provider value={{ name: props.name }}>
+      <Controller {...props}/>
+    </FormFieldContext.Provider>);
+};
+const useFormField = () => {
+    const fieldContext = React.useContext(FormFieldContext);
+    const itemContext = React.useContext(FormItemContext);
+    const { getFieldState, formState } = useFormContext();
+    const fieldState = getFieldState(fieldContext.name, formState);
+    if (!fieldContext) {
+        throw new Error("useFormField should be used within <FormField>");
+    }
+    const { id } = itemContext;
+    return Object.assign({ id, name: fieldContext.name, formItemId: `${id}-form-item`, formDescriptionId: `${id}-form-item-description`, formMessageId: `${id}-form-item-message` }, fieldState);
+};
+const FormItemContext = React.createContext({});
+const FormItem = React.forwardRef((_a, ref) => {
+    var { className } = _a, props = __rest(_a, ["className"]);
+    const id = React.useId();
+    return (<FormItemContext.Provider value={{ id }}>
+      <div ref={ref} className={cn("space-y-2", className)} {...props}/>
+    </FormItemContext.Provider>);
+});
+FormItem.displayName = "FormItem";
+const FormLabel = React.forwardRef((_a, ref) => {
+    var { className } = _a, props = __rest(_a, ["className"]);
+    const { error, formItemId } = useFormField();
+    return (<Label ref={ref} className={cn(error && "text-destructive", className)} htmlFor={formItemId} {...props}/>);
+});
+FormLabel.displayName = "FormLabel";
+const FormControl = React.forwardRef((_a, ref) => {
+    var props = __rest(_a, []);
+    const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
+    return (<Slot ref={ref} id={formItemId} aria-describedby={!error
+            ? `${formDescriptionId}`
+            : `${formDescriptionId} ${formMessageId}`} aria-invalid={!!error} {...props}/>);
+});
+FormControl.displayName = "FormControl";
+const FormDescription = React.forwardRef((_a, ref) => {
+    var { className } = _a, props = __rest(_a, ["className"]);
+    const { formDescriptionId } = useFormField();
+    return (<p ref={ref} id={formDescriptionId} className={cn("text-[0.8rem] text-muted-foreground", className)} {...props}/>);
+});
+FormDescription.displayName = "FormDescription";
+const FormMessage = React.forwardRef((_a, ref) => {
+    var _b;
+    var { className, children } = _a, props = __rest(_a, ["className", "children"]);
+    const { error, formMessageId } = useFormField();
+    const body = error ? String((_b = error === null || error === void 0 ? void 0 : error.message) !== null && _b !== void 0 ? _b : "") : children;
+    if (!body) {
+        return null;
+    }
+    return (<p ref={ref} id={formMessageId} className={cn("text-[0.8rem] font-medium text-destructive", className)} {...props}>
+      {body}
+    </p>);
+});
+FormMessage.displayName = "FormMessage";
+export { useFormField, Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage, FormField, };
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZm9ybS5qc3giLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJmb3JtLnRzeCJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQSxZQUFZLENBQUE7Ozs7Ozs7Ozs7OztBQUVaLE9BQU8sS0FBSyxLQUFLLE1BQU0sT0FBTyxDQUFBO0FBRTlCLE9BQU8sRUFBRSxJQUFJLEVBQUUsTUFBTSxzQkFBc0IsQ0FBQTtBQUMzQyxPQUFPLEVBQ0wsVUFBVSxFQUNWLFlBQVksRUFDWixjQUFjLEdBSWYsTUFBTSxpQkFBaUIsQ0FBQTtBQUV4QixPQUFPLEVBQUUsRUFBRSxFQUFFLE1BQU0sYUFBYSxDQUFBO0FBQ2hDLE9BQU8sRUFBRSxLQUFLLEVBQUUsTUFBTSx1QkFBdUIsQ0FBQTtBQUU3QyxNQUFNLElBQUksR0FBRyxZQUFZLENBQUE7QUFTekIsTUFBTSxnQkFBZ0IsR0FBRyxLQUFLLENBQUMsYUFBYSxDQUMxQyxFQUEyQixDQUM1QixDQUFBO0FBRUQsTUFBTSxTQUFTLEdBQUcsQ0FHaEIsRUFFcUMsRUFBRSxFQUFFO1FBRHRDLEtBQUssY0FEUixFQUVELENBRFM7SUFFUixPQUFPLENBQ0wsQ0FBQyxnQkFBZ0IsQ0FBQyxRQUFRLENBQUMsS0FBSyxDQUFDLENBQUMsRUFBRSxJQUFJLEVBQUUsS0FBSyxDQUFDLElBQUksRUFBRSxDQUFDLENBQ3JEO01BQUEsQ0FBQyxVQUFVLENBQUMsSUFBSSxLQUFLLENBQUMsRUFDeEI7SUFBQSxFQUFFLGdCQUFnQixDQUFDLFFBQVEsQ0FBQyxDQUM3QixDQUFBO0FBQ0gsQ0FBQyxDQUFBO0FBRUQsTUFBTSxZQUFZLEdBQUcsR0FBRyxFQUFFO0lBQ3hCLE1BQU0sWUFBWSxHQUFHLEtBQUssQ0FBQyxVQUFVLENBQUMsZ0JBQWdCLENBQUMsQ0FBQTtJQUN2RCxNQUFNLFdBQVcsR0FBRyxLQUFLLENBQUMsVUFBVSxDQUFDLGVBQWUsQ0FBQyxDQUFBO0lBQ3JELE1BQU0sRUFBRSxhQUFhLEVBQUUsU0FBUyxFQUFFLEdBQUcsY0FBYyxFQUFF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

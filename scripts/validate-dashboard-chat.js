@@ -1,0 +1,76 @@
+import { chromium } from 'playwright';
+async function run() {
+    const BASE_URL = process.env.BASE_URL || 'http://localhost:3025';
+    const EMAIL = process.env.TEST_EMAIL || 'alexandretmoraes1@gmail.com';
+    const PASSWORD = process.env.TEST_PASSWORD || 'Y*mare2025';
+    const browser = await chromium.launch({ headless: true });
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    // Capture console and network errors
+    page.on('console', (msg) => {
+        if (['error', 'warning'].includes(msg.type())) {
+            console.log(`[console.${msg.type()}]`, msg.text());
+        }
+    });
+    page.on('response', async (resp) => {
+        const url = resp.url();
+        if (url.includes('/api/auth/callback/credentials') || url.includes('/api/chat')) {
+            console.log(`[response] ${resp.status()} ${url}`);
+            if (!resp.ok()) {
+                try {
+                    const txt = await resp.text();
+                    console.log('[response body]', txt);
+                }
+                catch (_a) { }
+            }
+        }
+    });
+    const log = (msg) => console.log(`[validate] ${msg}`);
+    try {
+        log('Opening sign-in page');
+        await page.goto(`${BASE_URL}/auth/signin`, { waitUntil: 'domcontentloaded' });
+        await page.getByPlaceholder('Seu email').fill(EMAIL);
+        await page.getByPlaceholder('Sua senha').fill(PASSWORD);
+        await page.getByRole('button', { name: /Entrar com email/i }).click();
+        // Log current URL post-click
+        await page.waitForTimeout(1000);
+        console.log('[validate] After click URL:', page.url());
+        // Wait for Dashboard content heuristic
+        await page.waitForLoadState('networkidle', { timeout: 30000 });
+        const planVisible = await page.getByText('Plano:').first().isVisible().catch(() => false);
+        const creditsVisible = await page.getByText('Créditos:').first().isVisible().catch(() => false);
+        log(`Dashboard badges -> Plano:${planVisible} Créditos:${creditsVisible}`);
+        if (!planVisible || !creditsVisible) {
+            const url = page.url();
+            throw new Error(`Dashboard badges not visible. Current URL: ${url}`);
+        }
+        // Check daily progress label
+        const dailyVisible = await page.getByText('Mensagens hoje').first().isVisible().catch(() => false);
+        log(`Daily progress visible: ${dailyVisible}`);
+        // Find textarea (dynamic placeholder) and send a message
+        const textbox = page.getByRole('textbox').first();
+        await textbox.click();
+        await textbox.fill('Teste: descreva os recursos do plano Free em 3 bullets.');
+        await page.keyboard.press('Enter');
+        // Wait for typing indicator then an assistant block
+        const typingAppeared = await page.getByText('Digitando...').first().isVisible({ timeout: 15000 }).catch(() => false);
+        log(`Typing indicator: ${typingAppeared}`);
+        await page.waitForTimeout(1000);
+        // Assistant message block style used in our UI
+        await page.waitForSelector('div.bg-gray-800.border-gray-700', { timeout: 30000 });
+        const blocks = await page.locator('div.bg-gray-800.border-gray-700').count();
+        log(`Assistant blocks: ${blocks}`);
+        if (blocks === 0) {
+            throw new Error('No assistant message blocks found after sending a message');
+        }
+        log('SUCCESS: Dashboard badges, progress and chat response validated');
+    }
+    finally {
+        await browser.close();
+    }
+}
+run().catch((err) => {
+    console.error('[validate] FAILED', err);
+    process.exit(1);
+});
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoidmFsaWRhdGUtZGFzaGJvYXJkLWNoYXQuanMiLCJzb3VyY2VSb290IjoiIiwic291cmNlcyI6WyJ2YWxpZGF0ZS1kYXNoYm9hcmQtY2hhdC50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQSxPQUFPLEVBQUUsUUFBUSxFQUFFLE1BQU0sWUFBWSxDQUFBO0FBRXJDLEtBQUssVUFBVSxHQUFHO0lBQ2hCLE1BQU0sUUFBUSxHQUFHLE9BQU8sQ0FBQyxHQUFHLENBQUMsUUFBUSxJQUFJLHVCQUF1QixDQUFBO0lBQ2hFLE1BQU0sS0FBSyxHQUFHLE9BQU8sQ0FBQyxHQUFHLENBQUMsVUFBVSxJQUFJLDZCQUE2QixDQUFBO0lBQ3JFLE1BQU0sUUFBUSxHQUFHLE9BQU8sQ0FBQyxHQUFHLENBQUMsYUFBYSxJQUFJLFlBQVksQ0FBQTtJQUUxRCxNQUFNLE9BQU8sR0FBRyxNQUFNLFFBQVEsQ0FBQyxNQUFNLENBQUMsRUFBRSxRQUFRLEVBQUUsSUFBSSxFQUFFLENBQUMsQ0FBQTtJQUN6RCxNQUFNLEdBQUcsR0FBRyxNQUFNLE9BQU8sQ0FBQyxVQUFVLEVBQUUsQ0FBQTtJQUN0QyxNQUFNLElBQUksR0FBRyxNQUFNLEdBQUcsQ0FBQyxPQUFPLEVBQUUsQ0FBQTtJQUVoQyxxQ0FBcUM7SUFDckMsSUFBSSxDQUFDLEVBQUUsQ0FBQyxTQUFTLEVBQUUsQ0FBQyxHQUFHLEVBQUUsRUFBRTtRQUN6QixJQUFJLENBQUMsT0FBTyxFQUFFLFNBQVMsQ0FBQyxDQUFDLFFBQVEsQ0FBQyxHQUFHLENBQUMsSUFBSSxFQUFFLENBQUMsRUFBRSxDQUFDO1lBQzlDLE9BQU8sQ0FBQyxHQUFHLENBQUMsWUFBWSxHQUFHLENBQUMsSUFBSSxFQUFFLEdBQUcsRUFBRSxHQUFHLENBQUMsSUFBSSxFQUFFLENBQUMsQ0FBQTtRQUNwRCxDQUFDO0lBQ0gsQ0FBQyxDQUFDLENBQUE7SUFDRixJQUFJLENBQUMsRUFBRSxDQUFDLFVBQVUsRUFBRSxLQUFLLEVBQUUsSUFBSSxFQUFFLEVBQUU7UUFD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

@@ -1,0 +1,238 @@
+app/api/admin/seed-credits/route.ts(73,27): error TS2353: Object literal may only specify known properties, and 'credits' does not exist in type 'UserSelect<DefaultArgs>'.
+app/api/admin/seed-credits/route.ts(81,15): error TS2353: Object literal may only specify known properties, and 'credits' does not exist in type '(Without<UserUpdateInput, UserUncheckedUpdateInput> & UserUncheckedUpdateInput) | (Without<...> & UserUpdateInput)'.
+app/api/admin/seed-credits/route.ts(81,30): error TS2339: Property 'credits' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'.
+app/api/admin/seed-credits/route.ts(82,27): error TS2353: Object literal may only specify known properties, and 'credits' does not exist in type 'UserSelect<DefaultArgs>'.
+app/api/admin/seed-credits/route.ts(89,36): error TS2339: Property 'credits' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'.
+app/api/admin/seed-credits/route.ts(89,67): error TS2339: Property 'credits' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'.
+app/api/debug-usage/route.ts(34,35): error TS2339: Property 'userUsage' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/debug-usage/route.ts(77,48): error TS7006: Parameter 'u' implicitly has an 'any' type.
+app/api/debug-user/route.ts(27,41): error TS2339: Property 'userUsage' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/debug/manual-upgrade/route.ts(57,11): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type '(Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput) | (Without<...> & SubscriptionCreateInput)'.
+app/api/debug/manual-upgrade/route.ts(93,13): error TS2339: Property 'finalUser' does not exist on type '{ userId: any; paymentId: any; planType: any; originalPlan: string | null; steps: any[]; }'.
+app/api/debug/manual-upgrade/route.ts(94,13): error TS2339: Property 'success' does not exist on type '{ userId: any; paymentId: any; planType: any; originalPlan: string | null; steps: any[]; }'.
+app/api/debug/payment-status/route.ts(35,5): error TS2322: Type '{ id: string; createdAt: Date; status: string | null; userId: string; provider: string | null; amount: number; subscriptionId: string | null; currency: string | null; paymentMethod: string | null; externalId: string | null; mercadoPagoPaymentId: string | null; creditPackageId: string | null; } | null' is not assignable to type 'null'.
+  Type '{ id: string; createdAt: Date; status: string | null; userId: string; provider: string | null; amount: number; subscriptionId: string | null; currency: string | null; paymentMethod: string | null; externalId: string | null; mercadoPagoPaymentId: string | null; creditPackageId: string | null; }' is not assignable to type 'null'.
+app/api/debug/payment-status/route.ts(49,5): error TS2322: Type '{ id: string; email: string; planType: string | null; createdAt: Date; updatedAt: Date; } | null' is not assignable to type 'null'.
+  Type '{ id: string; email: string; planType: string | null; createdAt: Date; updatedAt: Date; }' is not assignable to type 'null'.
+app/api/debug/payment-status/route.ts(62,5): error TS2322: Type '{ id: string; createdAt: Date; updatedAt: Date; body: string; status: string; headers: string | null; }[]' is not assignable to type 'never[]'.
+  Type '{ id: string; createdAt: Date; updatedAt: Date; body: string; status: string; headers: string | null; }' is not assignable to type 'never'.
+app/api/debug/payment-status/route.ts(70,5): error TS2322: Type '{ id: string; createdAt: Date; status: string | null; userId: string; provider: string | null; amount: number; subscriptionId: string | null; currency: string | null; paymentMethod: string | null; externalId: string | null; mercadoPagoPaymentId: string | null; creditPackageId: string | null; }[]' is not assignable to type 'never[]'.
+  Type '{ id: string; createdAt: Date; status: string | null; userId: string; provider: string | null; amount: number; subscriptionId: string | null; currency: string | null; paymentMethod: string | null; externalId: string | null; mercadoPagoPaymentId: string | null; creditPackageId: string | null; }' is not assignable to type 'never'.
+app/api/debug/payment-status/route.ts(78,5): error TS2322: Type '{ id: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null; createdAt: Date; updatedAt: Date; status: string; userId: string; mercadoPagoPaymentId: string | null; plan: string | null; stripeSubscriptionId: string | null; }[]' is not assignable to type 'never[]'.
+  Type '{ id: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null; createdAt: Date; updatedAt: Date; status: string; userId: string; mercadoPagoPaymentId: string | null; plan: string | null; stripeSubscriptionId: string | null; }' is not assignable to type 'never'.
+app/api/debug/payment-status/route.ts(85,14): error TS18046: 'error' is of type 'unknown'.
+app/api/debug/payment-status/route.ts(86,14): error TS18046: 'error' is of type 'unknown'.
+app/api/knowledge/[id]/route.ts(34,36): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/knowledge/[id]/route.ts(87,36): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/knowledge/[id]/route.ts(136,36): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/knowledge/route.ts(65,40): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/knowledge/route.ts(111,41): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/knowledge/route.ts(154,36): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/mercadopago/subscription/route.ts(54,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/api/mercadopago/webhook/route.ts(242,17): error TS2353: Object literal may only specify known properties, and 'credits' does not exist in type '(Without<UserUpdateInput, UserUncheckedUpdateInput> & UserUncheckedUpdateInput) | (Without<...> & UserUpdateInput)'.
+app/api/mercadopago/webhook/route.ts(338,69): error TS2353: Object literal may only specify known properties, and 'mercadoPagoCustomerId' does not exist in type '(Without<UserUpdateInput, UserUncheckedUpdateInput> & UserUncheckedUpdateInput) | (Without<...> & UserUpdateInput)'.
+app/api/mercadopago/webhook/route.ts(356,13): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type '(Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput) | (Without<...> & SubscriptionCreateInput)'.
+app/api/models/usage/route.ts(22,32): error TS2339: Property 'userUsage' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/models/usage/route.ts(38,38): error TS7006: Parameter 'u' implicitly has an 'any' type.
+app/api/onboarding/route.ts(32,9): error TS2353: Object literal may only specify known properties, and 'phone' does not exist in type '(Without<UserUpdateInput, UserUncheckedUpdateInput> & UserUncheckedUpdateInput) | (Without<...> & UserUpdateInput)'.
+app/api/onboarding/route.ts(77,9): error TS2353: Object literal may only specify known properties, and 'phone' does not exist in type 'UserSelect<DefaultArgs>'.
+app/api/payments/mp/checkout/boleto/route.ts(58,18): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/boleto/route.ts(109,20): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/boleto/route.ts(123,18): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/card/route.ts(55,18): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/card/route.ts(104,20): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/card/route.ts(117,18): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/pix/route.ts(38,18): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/pix/route.ts(82,20): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/payments/mp/checkout/pix/route.ts(95,18): error TS2339: Property 'paymentTransaction' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/profile/route.ts(25,9): error TS2353: Object literal may only specify known properties, and 'profession' does not exist in type 'UserSelect<DefaultArgs>'.
+app/api/profile/route.ts(78,9): error TS2353: Object literal may only specify known properties, and 'profession' does not exist in type 'UserSelect<DefaultArgs>'.
+app/api/public-test-chat/route.ts(37,22): error TS2339: Property 'openRouterAuth' does not exist on type '{}'.
+app/api/public-test-chat/route.ts(63,26): error TS2339: Property 'chatCompletion' does not exist on type '{}'.
+app/api/public-test-chat/route.ts(71,26): error TS2339: Property 'chatCompletion' does not exist on type '{}'.
+app/api/public-test-chat/route.ts(83,22): error TS2339: Property 'openRouterError' does not exist on type '{}'.
+app/api/public-test-chat/route.ts(90,20): error TS2339: Property 'openRouterAuth' does not exist on type '{}'.
+app/api/public/manual-upgrade/route.ts(57,11): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type '(Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput) | (Without<...> & SubscriptionCreateInput)'.
+app/api/public/manual-upgrade/route.ts(93,13): error TS2339: Property 'finalUser' does not exist on type '{ userId: any; paymentId: any; planType: any; originalPlan: string | null; steps: any[]; }'.
+app/api/public/manual-upgrade/route.ts(94,13): error TS2339: Property 'success' does not exist on type '{ userId: any; paymentId: any; planType: any; originalPlan: string | null; steps: any[]; }'.
+app/api/stripe/mock-checkout/success/route.ts(43,9): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type 'Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput'.
+app/api/stripe/webhook/route.ts(7,10): error TS2724: '"@prisma/client"' has no exported member named 'SubscriptionStatus'. Did you mean 'Subscription'?
+app/api/stripe/webhook/route.ts(7,30): error TS2305: Module '"@prisma/client"' has no exported member 'PlanType'.
+app/api/stripe/webhook/route.ts(59,9): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type '(Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput) | (Without<...> & SubscriptionCreateInput)'.
+app/api/stripe/webhook/route.ts(135,44): error TS2353: Object literal may only specify known properties, and 'expiresAt' does not exist in type '(Without<SubscriptionUpdateInput, SubscriptionUncheckedUpdateInput> & SubscriptionUncheckedUpdateInput) | (Without<...> & SubscriptionUpdateInput)'.
+app/api/stripe/webhook/route.ts(144,13): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type 'Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput'.
+app/api/stripe/webhook/route.ts(161,13): error TS2353: Object literal may only specify known properties, and 'stripePaymentId' does not exist in type 'Without<PaymentCreateInput, PaymentUncheckedCreateInput> & PaymentUncheckedCreateInput'.
+app/api/stripe/webhook/route.ts(209,13): error TS2353: Object literal may only specify known properties, and 'expiresAt' does not exist in type '(Without<SubscriptionUpdateManyMutationInput, SubscriptionUncheckedUpdateManyInput> & SubscriptionUncheckedUpdateManyInput) | (Without<...> & SubscriptionUpdateManyMutationInput)'.
+app/api/templates/[id]/route.ts(15,32): error TS2345: Argument of type '(_req: NextRequest, context: { params: unknown; }) => Promise<any>' is not assignable to parameter of type '(req: Request) => Promise<any>'.
+  Target signature provides too few arguments. Expected 2 or more, but got 1.
+app/api/templates/[id]/route.ts(16,3): error TS2554: Expected 1 arguments, but got 0.
+app/api/templates/[id]/route.ts(21,15): error TS2339: Property 'success' does not exist on type 'Promise<Response | { id: string; }>'.
+app/api/templates/[id]/route.ts(21,49): error TS2339: Property 'error' does not exist on type 'Promise<Response | { id: string; }>'.
+app/api/templates/[id]/route.ts(26,35): error TS2345: Argument of type '(_req: NextRequest, context: { params: unknown; }) => Promise<any>' is not assignable to parameter of type '(req: Request) => Promise<any>'.
+  Target signature provides too few arguments. Expected 2 or more, but got 1.
+app/api/templates/[id]/route.ts(27,3): error TS2554: Expected 1 arguments, but got 0.
+app/api/templates/[id]/route.ts(32,15): error TS2339: Property 'success' does not exist on type 'Promise<Response | { id: string; }>'.
+app/api/templates/[id]/route.ts(32,49): error TS2339: Property 'error' does not exist on type 'Promise<Response | { id: string; }>'.
+app/api/templates/[id]/use/route.ts(21,33): error TS2345: Argument of type '(req: NextRequest, context: { params: unknown; }) => Promise<any>' is not assignable to parameter of type '(req: Request) => Promise<any>'.
+  Target signature provides too few arguments. Expected 2 or more, but got 1.
+app/api/templates/[id]/use/route.ts(24,3): error TS2554: Expected 1 arguments, but got 0.
+app/api/templates/[id]/use/route.ts(27,21): error TS2339: Property 'success' does not exist on type 'Promise<Response | { id: string; }>'.
+app/api/templates/[id]/use/route.ts(27,61): error TS2339: Property 'error' does not exist on type 'Promise<Response | { id: string; }>'.
+app/api/templates/[id]/use/route.ts(40,19): error TS2339: Property 'success' does not exist on type 'Promise<Response | { variables?: Record<string, any> | undefined; } | undefined>'.
+app/api/templates/[id]/use/route.ts(40,57): error TS2339: Property 'error' does not exist on type 'Promise<Response | { variables?: Record<string, any> | undefined; } | undefined>'.
+app/api/templates/route.ts(25,36): error TS2339: Property 'promptTemplate' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/templates/route.ts(83,35): error TS2339: Property 'promptTemplate' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/test/simulate-payment-public/route.ts(51,9): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type '(Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput) | (Without<...> & SubscriptionCreateInput)'.
+app/api/test/simulate-payment/route.ts(48,9): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type 'Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput'.
+app/api/test/upgrade-plan/route.ts(49,11): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type '(Without<SubscriptionUpdateInput, SubscriptionUncheckedUpdateInput> & SubscriptionUncheckedUpdateInput) | (Without<...> & SubscriptionUpdateInput)'.
+app/api/test/upgrade-plan/route.ts(57,11): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type 'Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput'.
+app/api/user/export-data/route.ts(56,41): error TS2339: Property 'messages' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; title: string | null; userId: string; modelUsed: string | null; isArchived: boolean; }'.
+app/api/user/export-data/route.ts(56,58): error TS2339: Property 'messages' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; title: string | null; userId: string; modelUsed: string | null; isArchived: boolean; }'.
+app/checkout/page.tsx(242,29): error TS2339: Property 'success' does not exist on type '({ ...props }: Toast) => { id: string; dismiss: () => void; update: (props: ToasterToast) => void; }'.
+app/checkout/page.tsx(246,29): error TS2339: Property 'error' does not exist on type '({ ...props }: Toast) => { id: string; dismiss: () => void; update: (props: ToasterToast) => void; }'.
+app/checkout/page.tsx(249,27): error TS2339: Property 'error' does not exist on type '({ ...props }: Toast) => { id: string; dismiss: () => void; update: (props: ToasterToast) => void; }'.
+app/dashboard/models/page.tsx(214,38): error TS2322: Type 'Dispatch<SetStateAction<"all" | "fast" | "advanced" | "credit">>' is not assignable to type '(value: string) => void'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'string' is not assignable to type 'SetStateAction<"all" | "fast" | "advanced" | "credit">'.
+app/payment/pending/page.tsx(64,26): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/payment/pending/page.tsx(74,26): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/payment/pending/page.tsx(118,24): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/payment/pending/page.tsx(130,26): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/test-flow/page.tsx(40,18): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/test-flow/page.tsx(46,18): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/test-flow/page.tsx(61,18): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/test-flow/page.tsx(67,18): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/test-flow/page.tsx(87,18): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+app/test-flow/page.tsx(93,18): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+components/dashboard/credit-transaction-list.tsx(165,9): error TS2607: JSX element class does not support attributes because it does not have a 'props' property.
+components/dashboard/credit-transaction-list.tsx(165,10): error TS2786: 'History' cannot be used as a JSX component.
+  Its type '{ new (): History; prototype: History; }' is not a valid JSX element type.
+    Type '{ new (): History; prototype: History; }' is not assignable to type 'new (props: any, context: any) => Component<any, any, any>'.
+      Type 'History' is missing the following properties from type 'Component<any, any, any>': context, setState, forceUpdate, render, props
+create-test-user.ts(30,9): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput)'. Did you mean to write 'password'?
+lib/ai/openai-provider.ts(175,9): error TS2769: No overload matches this call.
+  Overload 3 of 3, '(body: ChatCompletionCreateParamsBase, options?: RequestOptions<unknown> | undefined): APIPromise<ChatCompletion | Stream<...>>', gave the following error.
+    Type '({ role: any; content: string; } | { role: any; content: { type: "text" | "image_url"; text?: string | undefined; image_url?: { url: string; } | undefined; }[]; })[]' is not assignable to type 'ChatCompletionMessageParam[]'.
+      Type '{ role: any; content: string; } | { role: any; content: { type: "text" | "image_url"; text?: string | undefined; image_url?: { url: string; } | undefined; }[]; }' is not assignable to type 'ChatCompletionMessageParam'.
+        Type '{ role: any; content: { type: "text" | "image_url"; text?: string; image_url?: { url: string; }; }[]; }' is not assignable to type 'ChatCompletionMessageParam'.
+          Property 'name' is missing in type '{ role: any; content: { type: "text" | "image_url"; text?: string; image_url?: { url: string; }; }[]; }' but required in type 'ChatCompletionFunctionMessageParam'.
+lib/ai/providers.ts(2,10): error TS2305: Module '"ai"' has no exported member 'OpenAIStream'.
+lib/ai/providers.ts(2,24): error TS2305: Module '"ai"' has no exported member 'StreamingTextResponse'.
+lib/auth-simple.ts(26,30): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+lib/auth-simple.ts(32,18): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+lib/credit-service.ts(125,11): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'Without<CreditTransactionCreateInput, CreditTransactionUncheckedCreateInput> & CreditTransactionUncheckedCreateInput'.
+lib/credit-service.ts(171,11): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'Without<CreditTransactionCreateInput, CreditTransactionUncheckedCreateInput> & CreditTransactionUncheckedCreateInput'.
+lib/subscription-service.ts(3,10): error TS2724: '"@prisma/client"' has no exported member named 'SubscriptionStatus'. Did you mean 'Subscription'?
+lib/subscription-service.ts(43,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+lib/subscription-service.ts(69,9): error TS2353: Object literal may only specify known properties, and 'expiresAt' does not exist in type '(Without<SubscriptionUpdateInput, SubscriptionUncheckedUpdateInput> & SubscriptionUncheckedUpdateInput) | (Without<...> & SubscriptionUpdateInput)'.
+lib/subscription-service.ts(74,9): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type 'Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput'.
+next.config.ts(34,13): error TS7006: Parameter 'config' implicitly has an 'any' type.
+next.config.ts(34,23): error TS7031: Binding element 'dev' implicitly has an 'any' type.
+next.config.ts(34,28): error TS7031: Binding element 'isServer' implicitly has an 'any' type.
+prisma/seed-credits.ts(67,18): error TS2339: Property 'aIModel' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+prisma/seed-credits.ts(105,18): error TS2339: Property 'tool' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+prisma/seed-credits.ts(138,9): error TS2353: Object literal may only specify known properties, and 'description' does not exist in type 'Without<CreditTransactionCreateInput, CreditTransactionUncheckedCreateInput> & CreditTransactionUncheckedCreateInput'.
+prisma/seed.ts(1,24): error TS2305: Module '"@prisma/client"' has no exported member 'PromptCategory'.
+prisma/seed.ts(41,18): error TS2339: Property 'aIModel' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+prisma/seed.ts(76,18): error TS2339: Property 'planLimit' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+prisma/seed.ts(99,9): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput)'. Did you mean to write 'password'?
+prisma/seed.ts(264,35): error TS2339: Property 'promptTemplate' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+prisma/seed.ts(269,20): error TS2339: Property 'promptTemplate' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/check-openrouter-models.ts(78,11): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/check-usage-data.ts(36,35): error TS2339: Property 'userUsage' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/check-usage-data.ts(50,22): error TS7006: Parameter 'usage' implicitly has an 'any' type.
+scripts/create-payment-test-user.ts(26,7): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput)'. Did you mean to write 'password'?
+scripts/create-template-test-user.ts(26,7): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput)'. Did you mean to write 'password'?
+scripts/create-test-user.ts(28,9): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput)'. Did you mean to write 'password'?
+scripts/cron/expire-subscriptions.ts(1,24): error TS2724: '"@prisma/client"' has no exported member named 'SubscriptionStatus'. Did you mean 'Subscription'?
+scripts/cron/expire-subscriptions.ts(1,44): error TS2305: Module '"@prisma/client"' has no exported member 'PlanType'.
+scripts/cron/expire-subscriptions.ts(15,9): error TS2353: Object literal may only specify known properties, and 'expiresAt' does not exist in type 'SubscriptionWhereInput'.
+scripts/cron/expire-subscriptions.ts(38,118): error TS2339: Property 'user' does not exist on type '{ id: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null; createdAt: Date; updatedAt: Date; status: string; userId: string; mercadoPagoPaymentId: string | null; plan: string | null; stripeSubscriptionId: string | null; }'.
+scripts/cron/expire-subscriptions.ts(38,160): error TS2339: Property 'user' does not exist on type '{ id: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null; createdAt: Date; updatedAt: Date; status: string; userId: string; mercadoPagoPaymentId: string | null; plan: string | null; stripeSubscriptionId: string | null; }'.
+scripts/cron/expire-subscriptions.ts(49,26): error TS2339: Property 'user' does not exist on type '{ id: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null; createdAt: Date; updatedAt: Date; status: string; userId: string; mercadoPagoPaymentId: string | null; plan: string | null; stripeSubscriptionId: string | null; }'.
+scripts/debug-ai-service.ts(20,31): error TS18046: 'error' is of type 'unknown'.
+scripts/debug-ai-service.ts(30,31): error TS18046: 'error' is of type 'unknown'.
+scripts/debug-ai-service.ts(41,31): error TS18046: 'error' is of type 'unknown'.
+scripts/debug-ai-service.ts(57,47): error TS18046: 'error' is of type 'unknown'.
+scripts/debug-openrouter.ts(29,17): error TS2341: Property 'apiKey' is private and only accessible within class 'OpenRouterProvider'.
+scripts/debug-openrouter.ts(45,49): error TS18046: 'error' is of type 'unknown'.
+scripts/debug-openrouter.ts(59,44): error TS18046: 'error' is of type 'unknown'.
+scripts/diagnose-chat-issue.ts(35,31): error TS18046: 'error' is of type 'unknown'.
+scripts/diagnose-chat-issue.ts(77,48): error TS18046: 'error' is of type 'unknown'.
+scripts/fix-models-database.ts(9,41): error TS2339: Property 'aIModel' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/fix-models-database.ts(15,30): error TS7006: Parameter 'model' implicitly has an 'any' type.
+scripts/fix-models-database.ts(31,42): error TS7006: Parameter 'm' implicitly has an 'any' type.
+scripts/fix-models-database.ts(41,52): error TS7006: Parameter 'm' implicitly has an 'any' type.
+scripts/fix-models-database.ts(121,39): error TS2339: Property 'aIModel' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/fix-models-database.ts(126,24): error TS2339: Property 'aIModel' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/fix-models-database.ts(135,55): error TS18046: 'error' is of type 'unknown'.
+scripts/fix-models-database.ts(143,38): error TS2339: Property 'aIModel' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/fix-models-database.ts(159,51): error TS7006: Parameter 'm' implicitly has an 'any' type.
+scripts/fix-subscription.ts(34,9): error TS2353: Object literal may only specify known properties, and 'planType' does not exist in type 'Without<SubscriptionCreateInput, SubscriptionUncheckedCreateInput> & SubscriptionUncheckedCreateInput'.
+scripts/test-api-directly.ts(44,44): error TS18046: 'error' is of type 'unknown'.
+scripts/test-api-directly.ts(62,40): error TS18046: 'error' is of type 'unknown'.
+scripts/test-api-directly.ts(67,47): error TS18046: 'error' is of type 'unknown'.
+scripts/test-api-directly.ts(83,64): error TS18046: 'error' is of type 'unknown'.
+scripts/test-api-directly.ts(99,57): error TS18046: 'error' is of type 'unknown'.
+scripts/test-auth.ts(19,9): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput)'. Did you mean to write 'password'?
+scripts/test-auth.ts(37,34): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+scripts/test-auth.ts(41,66): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+scripts/test-chat-chain.ts(97,50): error TS18046: 'error' is of type 'unknown'.
+scripts/test-chat-chain.ts(118,49): error TS18046: 'error' is of type 'unknown'.
+scripts/test-chat-simple.ts(66,33): error TS2339: Property 'aIModel' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/test-chat-simple.ts(72,21): error TS7006: Parameter 'model' implicitly has an 'any' type.
+scripts/test-chat-simple.ts(72,28): error TS7006: Parameter 'index' implicitly has an 'any' type.
+scripts/test-chat-simple.ts(78,36): error TS2339: Property 'planLimit' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/test-chat-simple.ts(93,32): error TS2339: Property 'userUsage' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/test-chat-simple.ts(104,21): error TS7006: Parameter 'u' implicitly has an 'any' type.
+scripts/test-database-connection.ts(64,28): error TS18046: 'error' is of type 'unknown'.
+scripts/test-database-connection.ts(66,9): error TS18046: 'error' is of type 'unknown'.
+scripts/test-database-connection.ts(68,16): error TS18046: 'error' is of type 'unknown'.
+scripts/test-database-connection.ts(70,16): error TS18046: 'error' is of type 'unknown'.
+scripts/test-knowledge-base.ts(56,36): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/test-knowledge-base.ts(64,38): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/test-knowledge-base.ts(78,25): error TS7006: Parameter 'item' implicitly has an 'any' type.
+scripts/test-knowledge-base.ts(106,20): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/test-knowledge-base.ts(113,44): error TS2339: Property 'knowledgeBase' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+scripts/test-mercadopago.ts(60,38): error TS2339: Property 'id' does not exist on type 'Preference'.
+scripts/test-mercadopago.ts(61,46): error TS2339: Property 'init_point' does not exist on type 'Preference'.
+scripts/test-payment-flow.ts(154,37): error TS2503: Cannot find namespace 'puppeteer'.
+scripts/test-production-openrouter.ts(43,45): error TS18046: 'error' is of type 'unknown'.
+scripts/test-production-openrouter.ts(73,53): error TS18046: 'error' is of type 'unknown'.
+scripts/test-production-openrouter.ts(87,45): error TS18046: 'error' is of type 'unknown'.
+scripts/test-production-openrouter.ts(110,53): error TS18046: 'error' is of type 'unknown'.
+scripts/test-ui-models.ts(69,8): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+scripts/test-ui-models.ts(70,5): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+scripts/test-ui-models.ts(72,3): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
+  No index signature with a parameter of type 'string' was found on type '{}'.
+scripts/test-ui-models.ts(77,3): error TS18046: 'models' is of type 'unknown'.
+scripts/test-ui-models.ts(77,18): error TS7006: Parameter 'model' implicitly has an 'any' type.
+scripts/test-updated-models.ts(9,49): error TS2367: This comparison appears to be unintentional because the types '"fast" | "advanced" | "reasoning"' and '"credit"' have no overlap.
+scripts/test-updated-models.ts(44,37): error TS2339: Property 'credits' does not exist on type 'AIModel'.
+scripts/update-user-plan.ts(1,24): error TS2305: Module '"@prisma/client"' has no exported member 'PlanType'.
+scripts/verify-production-user.ts(24,24): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+scripts/verify-production-user.ts(25,81): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+scripts/verify-production-user.ts(33,21): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserUpdateInput, UserUncheckedUpdateInput> & UserUncheckedUpdateInput) | (Without<...> & UserUpdateInput)'. Did you mean to write 'password'?
+scripts/verify-production-user.ts(51,11): error TS2561: Object literal may only specify known properties, but 'passwordHash' does not exist in type '(Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput)'. Did you mean to write 'password'?
+scripts/verify-production-user.ts(67,57): error TS18046: 'error' is of type 'unknown'.
+scripts/verify-production-user.ts(80,22): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+scripts/verify-production-user.ts(81,68): error TS2551: Property 'passwordHash' does not exist on type '{ id: string; email: string; name: string | null; password: string | null; creditBalance: number; planType: string | null; onboardingCompleted: boolean; currentPeriodStart: Date | null; ... 5 more ...; updatedAt: Date; }'. Did you mean 'password'?
+scripts/verify-production-user.ts(103,52): error TS18046: 'error' is of type 'unknown'.
+test-chat-complete.spec.ts(7,9): error TS7034: Variable 'consoleErrors' implicitly has type 'any[]' in some locations where its type cannot be determined.
+test-chat-complete.spec.ts(77,48): error TS18046: 'error' is of type 'unknown'.
+test-chat-complete.spec.ts(210,65): error TS18046: 'error' is of type 'unknown'.
+test-chat-complete.spec.ts(222,5): error TS7005: Variable 'consoleErrors' implicitly has an 'any[]' type.
+test-chat.spec.ts(68,9): error TS7034: Variable 'errors' implicitly has type 'any[]' in some locations where its type cannot be determined.
+test-chat.spec.ts(79,5): error TS7005: Variable 'errors' implicitly has an 'any[]' type.
+test-debug-complete.spec.ts(5,11): error TS7034: Variable 'consoleErrors' implicitly has type 'any[]' in some locations where its type cannot be determined.
+test-debug-complete.spec.ts(6,11): error TS7034: Variable 'networkErrors' implicitly has type 'any[]' in some locations where its type cannot be determined.
+test-debug-complete.spec.ts(72,9): error TS7005: Variable 'consoleErrors' implicitly has an 'any[]' type.
+test-debug-complete.spec.ts(77,9): error TS7005: Variable 'networkErrors' implicitly has an 'any[]' type.
+test-errors-only.spec.ts(4,9): error TS7034: Variable 'errors' implicitly has type 'any[]' in some locations where its type cannot be determined.
+test-errors-only.spec.ts(29,3): error TS7005: Variable 'errors' implicitly has an 'any[]' type.
+test-models-display.ts(10,63): error TS2367: This comparison appears to be unintentional because the types '"fast" | "advanced" | "reasoning"' and '"credit"' have no overlap.
+test-models-display.ts(47,28): error TS2367: This comparison appears to be unintentional because the types '"fast" | "advanced" | "reasoning"' and '"credit"' have no overlap.
