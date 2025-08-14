@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { MercadoPagoConfig, Payment } from 'mercadopago'
+import { PaymentStatus, normalizePaymentStatus } from '@/lib/constants/payment-status'
 
 // Initialize MercadoPago
 function getMercadoPagoPayment(): Payment {
@@ -50,16 +51,22 @@ export async function POST(request: NextRequest) {
       parsed_ref: parsedRef
     })
 
-    if (payment.status !== 'approved') {
+    const normalizedStatus = normalizePaymentStatus(payment.status)
+    if (normalizedStatus !== PaymentStatus.COMPLETED) {
       return NextResponse.json({ 
-        error: 'Payment not approved', 
+        error: 'Payment not completed', 
         status: payment.status 
       }, { status: 400 })
     }
 
-    // Check if payment was already processed
+    // Check if payment was already processed (by externalId or mercadoPagoPaymentId)
     const existingPayment = await prisma.payment.findFirst({
-      where: { mercadoPagoPaymentId: String(paymentId) }
+      where: {
+        OR: [
+          { externalId: String(paymentId) },
+          { mercadoPagoPaymentId: String(paymentId) }
+        ]
+      }
     })
 
     if (existingPayment) {
@@ -71,7 +78,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user subscription
-    const planType = (parsedRef.planId?.toUpperCase() || 'PRO') as any
+    const planType = (parsedRef?.planId && typeof parsedRef.planId === 'string'
+      ? parsedRef.planId.toUpperCase()
+      : 'PRO') as 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'
     const billingCycle = parsedRef.billingCycle || 'monthly'
     
     await prisma.user.update({
@@ -81,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     // Create subscription record
     const startDate = new Date()
-    let expiresDate = new Date(startDate)
+    const expiresDate = new Date(startDate)
     
     if (billingCycle === 'yearly') {
       expiresDate.setFullYear(startDate.getFullYear() + 1)
@@ -92,11 +101,12 @@ export async function POST(request: NextRequest) {
     await prisma.subscription.create({
       data: {
         userId: session.user.id,
-        planType,
+        // Schema usa 'plan'
+        plan: planType,
         status: 'ACTIVE',
-        mercadoPagoPaymentId: String(paymentId),
-        startedAt: startDate,
-        expiresAt: expiresDate
+        currentPeriodStart: startDate,
+        currentPeriodEnd: expiresDate,
+        mercadoPagoPaymentId: String(paymentId)
       }
     })
 
@@ -104,9 +114,12 @@ export async function POST(request: NextRequest) {
     await prisma.payment.create({
       data: {
         userId: session.user.id,
-        amount: payment.transaction_details?.total_paid_amount || 1.00,
+        amount: payment.transaction_details?.total_paid_amount || 1.0,
         currency: payment.currency_id || 'BRL',
-        status: 'COMPLETED',
+        status: PaymentStatus.COMPLETED,
+        provider: 'mercadopago',
+        paymentMethod: payment.payment_method_id || 'pix',
+        externalId: String(paymentId),
         mercadoPagoPaymentId: String(paymentId)
       }
     })
@@ -129,7 +142,7 @@ export async function POST(request: NextRequest) {
 }
 
 // GET endpoint to check subscription status
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -153,8 +166,8 @@ export async function GET(request: NextRequest) {
       planType: user?.planType || 'FREE',
       subscription: subscription ? {
         status: subscription.status,
-        expiresAt: subscription.expiresAt,
-        startedAt: subscription.startedAt
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd
       } : null
     })
 
@@ -165,4 +178,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}

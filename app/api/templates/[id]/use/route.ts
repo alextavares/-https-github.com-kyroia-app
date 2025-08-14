@@ -1,63 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { NextRequest } from 'next/server'
+import { z } from 'zod'
+import { NotFound } from '@/lib/http/errors'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
+import { validateWith } from '@/lib/validation/zod-helpers'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// Padronização: não existe modelo Template no Prisma atual.
+// Este endpoint retorna NotFound de forma consistente, mantendo validação e auth.
+
+const paramsSchema = z.object({
+  id: z.string().min(1, 'id é obrigatório'),
+})
+
+const bodySchema = z
+  .object({
+    variables: z.record(z.any()).optional(),
+  })
+  .optional()
+
+export async function POST(req: NextRequest, context: { params: unknown }) {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.error
+
+  const parsedParams = await validateWith(paramsSchema, context?.params ?? {})
+  if (parsedParams instanceof Response) return parsedParams
+
+  let body: unknown = undefined
   try {
-    const { id } = await params;
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      )
+    if (req.headers.get('content-type')?.includes('application/json')) {
+      body = await req.json()
     }
+  } catch {}
 
-    // Incrementa o contador de uso do template
-    const template = await prisma.promptTemplate.update({
-      where: { id },
-      data: {
-        usageCount: {
-          increment: 1
-        }
-      },
-      select: {
-        id: true,
-        name: true,
-        isPublic: true,
-        createdBy: true
-      }
-    })
+  const parsedBody = await validateWith(bodySchema, body)
+  if (parsedBody instanceof Response) return parsedBody
 
-    // Verifica se o usuário tem permissão para usar o template
-    if (!template.isPublic && template.createdBy !== session.user.id) {
-      // Reverte o incremento
-      await prisma.promptTemplate.update({
-        where: { id },
-        data: {
-          usageCount: {
-            decrement: 1
-          }
-        }
-      })
-      
-      return NextResponse.json(
-        { error: 'Sem permissão para usar este template' },
-        { status: 403 }
-      )
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error tracking template usage:', error)
-    return NextResponse.json(
-      { error: 'Erro ao registrar uso do template' },
-      { status: 500 }
-    )
-  }
+  return NotFound('Template não disponível neste ambiente')
 }

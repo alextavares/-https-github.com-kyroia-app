@@ -115,7 +115,7 @@ export default function PublicPricingPage() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">InnerAI - Preços</h1>
+          <h1 className="text-2xl font-bold">Kyroia - Preços</h1>
           <Button variant="ghost" onClick={() => router.push('/')}>
             Voltar
           </Button>

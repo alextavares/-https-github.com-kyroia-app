@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
-import { SubscriptionStatus } from '@prisma/client';
+import { PaymentStatus, normalizePaymentStatus } from '@/lib/constants/payment-status';
 
 // Initialize the MercadoPago client
 const client = new MercadoPagoConfig({ 
@@ -33,53 +33,41 @@ export async function updateSubscriptionFromWebhook(payload: WebhookPayload) {
       throw new Error(`Payment details or external_reference (userId) not found for payment ID: ${payload.data.id}`);
     }
 
-    const userId = paymentDetails.external_reference;
-    const status = paymentDetails.status;
+    const userId = paymentDetails.external_reference as string;
+    const status = paymentDetails.status as string | undefined;
+    if (!status) {
+      console.warn(`[subscription-service] Missing status for payment ${payload.data.id}; skipping update`)
+      return;
+    }
     const paymentId = payload.data.id;
 
     console.log(`Processing payment ${paymentId} for user ${userId} with status: ${status}`);
 
-    let subscriptionStatus: SubscriptionStatus;
-    switch (status) {
-      case 'approved':
-        subscriptionStatus = SubscriptionStatus.ACTIVE;
-        break;
-      case 'cancelled':
-        subscriptionStatus = SubscriptionStatus.CANCELLED;
-        break;
-      case 'rejected':
-      case 'failed':
-        // For failed payments, we might just log it or mark a subscription as past_due
-        // For now, we'll treat it as cancelled for simplicity.
-        subscriptionStatus = SubscriptionStatus.CANCELLED;
-        break;
-      default:
-        console.log(`Unhandled payment status: ${status}`);
-        return; // Exit if the status is not one we handle
-    }
-
+    const normalizedStatus = normalizePaymentStatus(status);
+    // Map statuses to current schema fields
+    const isActive = normalizedStatus === PaymentStatus.COMPLETED;
     const newEndDate = new Date();
-    newEndDate.setDate(newEndDate.getDate() + 30); // Add 30 days for an active subscription
+    newEndDate.setDate(newEndDate.getDate() + 30);
 
     await prisma.subscription.upsert({
       where: {
         mercadoPagoPaymentId: paymentId,
       },
       update: {
-        status: subscriptionStatus,
-        expiresAt: subscriptionStatus === 'ACTIVE' ? newEndDate : new Date(),
+        status: isActive ? 'ACTIVE' : 'CANCELED',
+        currentPeriodEnd: isActive ? newEndDate : new Date(),
       },
       create: {
         userId: userId,
         mercadoPagoPaymentId: paymentId,
-        planType: 'PRO', // This could also be derived from paymentDetails if available
-        status: subscriptionStatus,
-        startedAt: new Date(),
-        expiresAt: subscriptionStatus === 'ACTIVE' ? newEndDate : new Date(),
+        plan: 'PRO',
+        status: isActive ? 'ACTIVE' : 'CANCELED',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: isActive ? newEndDate : new Date(),
       },
     });
 
-    console.log(`Successfully processed payment ${paymentId} for user ${userId}. Status set to ${subscriptionStatus}.`);
+    console.log(`Successfully processed payment ${paymentId} for user ${userId}. Status set to ${isActive ? 'ACTIVE' : 'CANCELED'}.`);
 
   } catch (error) {
     console.error(`Failed to process payment ID ${payload.data.id}:`, error);

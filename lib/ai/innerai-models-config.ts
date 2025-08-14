@@ -1,6 +1,6 @@
-// Configuração EXATA dos modelos do InnerAI original
+// Configuração EXATA dos modelos do Kyroia original
 // Baseado na análise do site app.innerai.com - Janeiro 2025
-// ATENÇÃO: Esta lista deve ser EXATAMENTE igual à do InnerAI original
+// ATENÇÃO: Esta lista deve ser EXATAMENTE igual à do Kyroia original
 
 export interface AIModel {
   id: string
@@ -30,7 +30,7 @@ export interface AIModel {
 
 export const INNERAI_MODELS: AIModel[] = [
   // ===== MODELOS RÁPIDOS (Fast Models) =====
-  // Exatamente como no InnerAI original
+  // Exatamente como no Kyroia original
   
   {
     id: 'llama-4-scout',
@@ -129,7 +129,7 @@ export const INNERAI_MODELS: AIModel[] = [
   },
 
   // ===== MODELOS AVANÇADOS (Advanced Models) =====
-  // Exatamente como no InnerAI original
+  // Exatamente como no Kyroia original
   
   {
     id: 'gpt-4.1',
@@ -292,7 +292,7 @@ export const INNERAI_MODELS: AIModel[] = [
   },
 
   // ===== RACIOCÍNIO PROFUNDO (Deep Reasoning) =====
-  // Exatamente como no InnerAI original
+  // Exatamente como no Kyroia original
   
   {
     id: 'grok-4',
@@ -407,7 +407,7 @@ export const INNERAI_MODELS: AIModel[] = [
   },
 ]
 
-// Configurações de planos - EXATAMENTE como no InnerAI
+// Configurações de planos - EXATAMENTE como no Kyroia
 export const PLAN_LIMITS = {
   FREE: {
     fastModels: 'unlimited', // Modelos Rápidos: ilimitadas
@@ -431,7 +431,7 @@ export const PLAN_LIMITS = {
   },
 }
 
-// Categorias para filtros - EXATAMENTE como no InnerAI
+// Categorias para filtros - EXATAMENTE como no Kyroia
 export const MODEL_CATEGORIES = {
   fast: 'Modelos Rápidos',
   advanced: 'Modelos Avançados',
@@ -443,7 +443,7 @@ export function getModelsByCategory(category: 'fast' | 'advanced' | 'reasoning')
   return INNERAI_MODELS.filter(model => model.category === category && model.isAvailable)
 }
 
-// Função para obter modelos por plano - EXATAMENTE como no InnerAI
+// Função para obter modelos por plano - EXATAMENTE como no Kyroia
 export function getModelsForPlan(planType: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE') {
   const availableModels = INNERAI_MODELS.filter(model => model.isAvailable)
   

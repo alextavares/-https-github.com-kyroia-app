@@ -4,11 +4,24 @@ import { redirect, notFound } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, Coins, Star, Crown, X, ArrowLeft, CreditCard, Smartphone } from 'lucide-react'
+import { Check, Coins, Star, Crown, X, ArrowLeft, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { CreditService } from '@/lib/credit-service'
+import { prisma } from '@/lib/prisma'
+export const dynamic = 'force-dynamic'
 
-const creditPackages: Record<string, any> = {
+type CreditPackage = {
+  id: string;
+  credits: number;
+  price: number;
+  originalPrice: number | null;
+  discount: string | null;
+  icon: React.ComponentType<{ className?: string }>;
+  features: string[];
+  popular?: boolean;
+};
+
+const creditPackages: Record<string, CreditPackage> = {
   basic: {
     id: 'basic',
     credits: 5000,
@@ -55,19 +68,51 @@ const creditPackages: Record<string, any> = {
 }
 
 interface PageProps {
-  params: {
+  params: Promise<{
     package: string
-  }
+  }>
 }
 
-export default async function PackagePurchasePage({ params }: PageProps) {
+export default async function PackagePurchasePage(props: PageProps) {
+  // Next 15+: aguardar params
+  const { package: packageId } = await props.params
+  console.log('[purchase] param packageId =', packageId)
+
+  // Sessão do usuário
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     redirect('/auth/signin')
   }
 
-  const packageData = creditPackages[params.package]
+  // No-store via dynamic config (force-dynamic)
+
+  // Suporta tanto pacotes estáticos (basic/popular/premium) quanto pacotes do banco (id cuid)
+  let packageData = creditPackages[packageId] as CreditPackage | null
   if (!packageData) {
+    try {
+      console.log('[purchase] Looking up package in DB with ID:', packageId)
+      const row = await prisma.creditPackage.findUnique({
+        where: { id: packageId },
+        select: { id: true, credits: true, price: true, currency: true },
+      })
+      console.log('[purchase] DB lookup result:', row)
+      if (row) {
+        packageData = {
+          id: row.id,
+          credits: row.credits,
+          price: row.price,
+          originalPrice: null,
+          discount: null,
+          icon: Coins,
+          features: [],
+        }
+      }
+    } catch (e) {
+      console.error('[purchase] Error looking up package:', e)
+    }
+  }
+  if (!packageData) {
+    console.log('[purchase] No package found, calling notFound()')
     notFound()
   }
 
@@ -172,11 +217,11 @@ export default async function PackagePurchasePage({ params }: PageProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* PIX */}
-              <Button 
+              <Button
                 className="w-full h-16 bg-teal-600 hover:bg-teal-700 text-white justify-start gap-4"
                 asChild
               >
-                <Link href={`/dashboard/credits/payment/pix?package=${params.package}`}>
+                <Link href={`/dashboard/credits/payment/pix?package=${packageId}`}>
                   <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
                     <span className="text-xs font-bold text-teal-600">PIX</span>
                   </div>
@@ -188,11 +233,11 @@ export default async function PackagePurchasePage({ params }: PageProps) {
               </Button>
 
               {/* Credit Card */}
-              <Button 
+              <Button
                 className="w-full h-16 bg-gray-800 hover:bg-gray-700 text-white justify-start gap-4 border border-gray-600"
                 asChild
               >
-                <Link href={`/dashboard/credits/payment/card?package=${params.package}`}>
+                <Link href={`/dashboard/credits/payment/card?package=${packageId}`}>
                   <CreditCard className="h-6 w-6 text-gray-400" />
                   <div className="text-left">
                     <div className="font-medium">Cartão de Crédito</div>
@@ -202,11 +247,11 @@ export default async function PackagePurchasePage({ params }: PageProps) {
               </Button>
 
               {/* Boleto */}
-              <Button 
+              <Button
                 className="w-full h-16 bg-gray-800 hover:bg-gray-700 text-white justify-start gap-4 border border-gray-600"
                 asChild
               >
-                <Link href={`/dashboard/credits/payment/boleto?package=${params.package}`}>
+                <Link href={`/dashboard/credits/payment/boleto?package=${packageId}`}>
                   <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
                     <span className="text-xs font-bold text-white">B</span>
                   </div>

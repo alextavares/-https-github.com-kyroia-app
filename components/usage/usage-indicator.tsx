@@ -9,7 +9,9 @@ interface UsageData {
   planType: string
 }
 
-export default function UsageIndicator() {
+type Variant = "minimal" | "detailed"
+
+export default function UsageIndicator({ variant = "minimal" }: { variant?: Variant }) {
   const { data: session } = useSession()
   const [usage, setUsage] = useState<UsageData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -21,11 +23,9 @@ export default function UsageIndicator() {
       if (response.ok) {
         const data = await response.json()
         setUsage(data)
-      } else {
-        console.error("Usage API error:", response.status)
       }
-    } catch (error) {
-      console.error("Error fetching usage:", error)
+    } catch {
+      // silent
     } finally {
       setLoading(false)
     }
@@ -37,17 +37,26 @@ export default function UsageIndicator() {
     }
   }, [session, fetchUsage])
 
-  if (loading || !usage) {
-    return null
-  }
+  if (loading || !usage) return null
 
   const percentage = usage.dailyLimit > 0 
     ? (usage.dailyMessages / usage.dailyLimit) * 100 
     : 0
 
-  const isNearLimit = percentage >= 80
-  const isAtLimit = usage.dailyMessages >= usage.dailyLimit
+  const isNearLimit = usage.dailyLimit > 0 && percentage >= 80
+  const isAtLimit = usage.dailyLimit > 0 && usage.dailyMessages >= usage.dailyLimit
 
+  // Minimal: mostrar apenas quando perto ou no limite, como um badge discreto
+  if (variant === "minimal") {
+    if (!isNearLimit && !isAtLimit) return null
+    return (
+      <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 text-xs text-yellow-300">
+        {isAtLimit ? "Limite diário atingido" : "Próximo do limite diário"}
+      </div>
+    )
+  }
+
+  // Detailed (opcional)
   return (
     <div className="p-4 bg-card rounded-lg border border-border">
       <div className="flex items-center justify-between mb-2">
@@ -56,7 +65,6 @@ export default function UsageIndicator() {
           Plano {usage.planType}
         </span>
       </div>
-      
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span>Mensagens</span>
@@ -64,7 +72,6 @@ export default function UsageIndicator() {
             {usage.dailyMessages} / {usage.dailyLimit === -1 ? "∞" : usage.dailyLimit}
           </span>
         </div>
-        
         {usage.dailyLimit > 0 && (
           <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
             <div
@@ -75,7 +82,6 @@ export default function UsageIndicator() {
             />
           </div>
         )}
-        
         {isAtLimit && (
           <p className="text-xs text-destructive mt-2">
             Limite diário atingido. Faça upgrade para continuar.

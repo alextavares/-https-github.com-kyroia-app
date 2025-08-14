@@ -14,7 +14,7 @@ export default function Home() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <h1 className="text-2xl font-bold">
-              <GradientText>Inner AI</GradientText>
+              <GradientText>Kyroia</GradientText>
             </h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -113,7 +113,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border mt-12">
         <div className="container mx-auto px-4 py-6 text-center text-text-secondary">
-          <p>&copy; 2024 Inner AI Clone. Todos os direitos reservados.</p>
+          <p>&copy; 2024 Kyroia. Todos os direitos reservados.</p>
         </div>
       </footer>
     </div>

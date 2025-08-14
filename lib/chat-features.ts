@@ -55,6 +55,7 @@ export interface ChatSettings {
   mathRendering: boolean
 }
 
+/* keep single source of truth for schemas (avoid re-declare conflicts) */
 export const ChatMessageSchema = z.object({
   content: z.string().min(1).max(32000),
   attachments: z.array(z.object({
@@ -68,6 +69,7 @@ export const ChatMessageSchema = z.object({
   parentMessageId: z.string().uuid().optional()
 })
 
+/* keep single source of truth for schemas (avoid re-declare conflicts) */
 export const ChatSettingsSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().min(1).max(8192).default(2048),
@@ -362,5 +364,5 @@ export const MESSAGE_TEMPLATES = {
   }
 }
 
-export type { ChatSession, ChatMessage, ChatSettings, MessageAttachment }
-export { ChatMessageSchema, ChatSettingsSchema }
+/* removed duplicate re-exports to avoid conflicts */
+/* removed duplicate re-exports to avoid conflicts */

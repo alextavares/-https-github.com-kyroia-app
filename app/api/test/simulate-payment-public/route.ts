@@ -1,76 +1,81 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { PaymentStatus } from '@/lib/constants/payment-status'
 
-// Simula um pagamento aprovado para testes (versão pública)
 export async function POST(request: NextRequest) {
   try {
-    const { userId, planId, billingCycle } = await request.json()
+    const { userId } = await request.json()
     
-    if (!userId || !planId) {
-      return NextResponse.json({ error: 'userId and planId are required' }, { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
-
-    const cycle = billingCycle || 'monthly'
     
-    console.log(`[TEST] Simulating approved payment for user ${userId}, plan ${planId}, cycle ${cycle}`)
-    
-    // Simula dados do pagamento aprovado
-    const mockPaymentId = `TEST_${Date.now()}`
-    
-    // Atualiza o plano do usuário
-    await prisma.user.update({
+    // Check if user exists
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      data: { planType: planId.toUpperCase() as any }
+      select: { id: true, email: true, planType: true }
     })
     
-    // Cria subscription record
-    const startDate = new Date()
-    let expiresDate = new Date(startDate)
-    
-    if (cycle === 'yearly') {
-      expiresDate.setFullYear(startDate.getFullYear() + 1)
-    } else {
-      expiresDate.setMonth(startDate.getMonth() + 1)
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
-    await prisma.subscription.create({
+    
+    // Create a simulated payment
+    const simulatedPaymentId = `sim_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
+    
+    // Create payment record
+    const payment = await prisma.payment.create({
       data: {
         userId,
-        planType: planId.toUpperCase() as any,
+        amount: 49.90, // Basic plan
+        currency: 'BRL',
+        status: PaymentStatus.COMPLETED,
+        mercadoPagoPaymentId: simulatedPaymentId
+      }
+    })
+    
+    // Update user to basic plan
+    await prisma.user.update({
+      where: { id: userId },
+      data: { planType: 'BASIC' }
+    })
+    
+    // Create subscription
+    const startDate = new Date()
+    const expiresDate = new Date(startDate)
+    expiresDate.setMonth(startDate.getMonth() + 1)
+    
+    const subscription = await prisma.subscription.create({
+      data: {
+        userId,
+        planType: 'BASIC',
         status: 'ACTIVE',
-        mercadoPagoPaymentId: mockPaymentId,
+        mercadoPagoPaymentId: simulatedPaymentId,
         startedAt: startDate,
         expiresAt: expiresDate
       }
     })
     
-    // Cria payment record
-    await prisma.payment.create({
-      data: {
-        userId,
-        amount: 1, // Valor de teste
-        currency: 'BRL',
-        status: 'COMPLETED',
-        mercadoPagoPaymentId: mockPaymentId
-      }
-    })
-    
-    console.log(`[TEST] Payment simulation completed successfully`)
-    
-    return NextResponse.json({ 
-      success: true,
-      message: 'Payment simulated successfully',
-      paymentId: mockPaymentId,
+    console.log('✅ Simulated payment created:', {
+      paymentId: simulatedPaymentId,
       userId,
-      planId,
-      billingCycle: cycle
+      amount: payment.amount,
+      subscriptionId: subscription.id
     })
     
-  } catch (error) {
-    console.error('[TEST] Error simulating payment:', error)
-    return NextResponse.json(
-      { error: 'Failed to simulate payment' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      success: true,
+      paymentId: simulatedPaymentId,
+      payment,
+      subscription,
+      message: 'Payment simulation completed successfully'
+    }, { status: 200 })
+    
+  } catch (error: any) {
+    console.error('Simulate payment error:', error)
+    return NextResponse.json({ 
+      error: error.message,
+      stack: error.stack
+    }, { status: 500 })
   }
 }

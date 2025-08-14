@@ -18,8 +18,13 @@ async function processPendingWebhooks() {
   for (const webhook of pendingWebhooks) {
     console.log(`Processing webhook ID: ${webhook.id}`);
     try {
-      // The body is stored as a JSON object in the DB
-      const payload = webhook.body as any; 
+      // The body is stored as a stringified JSON in the DB (SQLite doesn't support Json type)
+      let payload: any = null;
+      try {
+        payload = typeof (webhook as any).body === 'string' ? JSON.parse((webhook as any).body) : (webhook as any).body;
+      } catch (e) {
+        throw new Error('Webhook log body is not valid JSON string');
+      }
       
       // We need to simulate the webhook structure that updateSubscriptionFromWebhook expects
       // This assumes the core data is in the 'body' field of the log

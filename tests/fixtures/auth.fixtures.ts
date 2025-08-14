@@ -2,7 +2,7 @@ import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
 // Mock user data
-export const mockUsers = [
+const mockUsersList = [
   {
     id: '1',
     email: 'test@example.com',
@@ -31,6 +31,15 @@ export const mockUsers = [
     image: null,
   },
 ];
+
+// Backwards-compatible exports used by different tests
+export const mockUsers = {
+  basic: mockUsersList[0],
+  pro: mockUsersList[1],
+  admin: mockUsersList[2],
+};
+
+export const mockUsersArray = mockUsersList;
 
 // Mock NextAuth configuration for testing
 export const mockAuthOptions: NextAuthOptions = {
@@ -105,6 +114,31 @@ export const mockSession = {
     image: null,
   },
   expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+};
+
+export const mockSessions = {
+  basic: {
+    user: {
+      id: mockUsersList[0].id,
+      email: mockUsersList[0].email,
+      name: mockUsersList[0].name,
+      role: mockUsersList[0].role,
+      plan: mockUsersList[0].plan,
+      image: mockUsersList[0].image,
+    },
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  pro: {
+    user: {
+      id: mockUsersList[1].id,
+      email: mockUsersList[1].email,
+      name: mockUsersList[1].name,
+      role: mockUsersList[1].role,
+      plan: mockUsersList[1].plan,
+      image: mockUsersList[1].image,
+    },
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  },
 };
 
 // Mock auth responses

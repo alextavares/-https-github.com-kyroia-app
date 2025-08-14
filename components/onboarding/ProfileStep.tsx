@@ -7,39 +7,51 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Camera, Upload } from 'lucide-react'
 
+interface ProfileDataShape {
+  name: string
+  lastName: string
+  phone: string
+  organization: string
+  profileImage?: string
+}
 interface ProfileStepProps {
-  profileData: {
-    name: string
-    lastName: string
-    phone: string
-    organization: string
-    profileImage?: string
-  }
-  onUpdate: (data: any) => void
+  profileData: ProfileDataShape
+  onUpdate: (data: ProfileDataShape) => void
 }
 
 export default function ProfileStep({ profileData, onUpdate }: ProfileStepProps) {
   const [formData, setFormData] = useState(profileData)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
-  // Use ref to avoid circular dependencies
-  const onUpdateRef = useRef(onUpdate)
-  onUpdateRef.current = onUpdate
+  // Use ref to hold last propagated value to avoid parent-child update loops
+  const lastSentRef = useRef<typeof formData>(formData)
 
-  // Update parent when formData changes
+  // Propagate to parent only when there is a meaningful change and it differs from last sent
   useEffect(() => {
-    onUpdateRef.current(formData)
-  }, [formData])
-
-  // Sync with profileData prop changes - only if different to avoid loops
-  useEffect(() => {
-    if (JSON.stringify(profileData) !== JSON.stringify(formData)) {
-      setFormData(profileData)
+    const changed =
+      JSON.stringify(formData) !== JSON.stringify(lastSentRef.current)
+    if (changed) {
+      onUpdate(formData)
+      lastSentRef.current = formData
     }
-  }, [profileData])
+    // Depend on formData and onUpdate; JSON compare prevents loops
+  }, [formData, onUpdate])
+
+  // Sync from parent props into local state only when actually different
+  useEffect(() => {
+    const differs = JSON.stringify(profileData) !== JSON.stringify(formData)
+    if (differs) {
+      setFormData(profileData)
+      // also align lastSentRef so next local effect won't re-send same data
+      lastSentRef.current = profileData
+    }
+  }, [profileData, formData])
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const next = { ...prev, [field]: value }
+      return next
+    })
   }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +61,10 @@ export default function ProfileStep({ profileData, onUpdate }: ProfileStepProps)
       reader.onload = (e) => {
         const imageUrl = e.target?.result as string
         setImagePreview(imageUrl)
-        setFormData(prev => ({ ...prev, profileImage: imageUrl }))
+        setFormData(prev => {
+          const next = { ...prev, profileImage: imageUrl }
+          return next
+        })
       }
       reader.readAsDataURL(file)
     }

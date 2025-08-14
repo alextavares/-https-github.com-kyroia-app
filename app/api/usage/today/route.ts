@@ -1,90 +1,87 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
+import { handleRoute, Unauthorized, NotFound } from '@/lib/http/errors'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { message: "Não autorizado" },
-        { status: 401 }
-      )
+/**
+ * GET /api/usage/today
+ * Padrão: handleRoute + requireAuth + setNoStore
+ * Observação: Schema atual não possui UserUsage; cálculo via Conversation.messages (Json[])
+ */
+type JsonMessage = {
+  createdAt?: string | number | Date
+  [k: string]: unknown
+} | null
+
+export async function GET() {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      return Unauthorized(auth.error?.message ?? 'Não autorizado')
     }
 
-    // Get user with plan info
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: {
-        userUsage: {
-          where: {
-            date: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)),
-              lt: new Date(new Date().setHours(23, 59, 59, 999))
-            }
-          }
-        }
-      }
+      where: { id: auth.userId },
+      select: { id: true, planType: true, createdAt: true },
     })
-
     if (!user) {
-      return NextResponse.json(
-        { message: "Usuário não encontrado" },
-        { status: 404 }
-      )
+      return NotFound('Usuário não encontrado')
     }
 
-    // Get plan limits
-    const planLimits = await prisma.planLimit.findUnique({
-      where: { planType: user.planType }
+    // Janela de hoje (UTC)
+    const startOfDay = new Date()
+    startOfDay.setUTCHours(0, 0, 0, 0)
+    const endOfDay = new Date()
+    endOfDay.setUTCHours(23, 59, 59, 999)
+
+    // Limites (defaults simples; ajustar conforme política de planos)
+    const dailyLimit: number | null = 10
+    const monthlyTokenLimit: number | null = null
+
+    // Busca conversas do usuário (limite razoável para performance)
+    const conversations = await prisma.conversation.findMany({
+      where: { userId: auth.userId },
+      orderBy: { createdAt: 'desc' },
+      select: { messages: true, createdAt: true },
+      take: 200,
     })
 
-    // Calculate today's usage
-    const todayMessages = user.userUsage.reduce((total, usage) => 
-      total + usage.messagesCount, 0
-    )
-
-    const dailyLimit = planLimits?.dailyMessagesLimit ?? 10
-
-    // Get monthly token usage
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    const monthlyUsage = await prisma.userUsage.aggregate({
-      where: {
-        userId: session.user.id,
-        date: {
-          gte: startOfMonth,
-          lt: new Date()
+    // Contabiliza mensagens de hoje
+    let todayMessages = 0
+    conversations.forEach((c) => {
+      const msgs = Array.isArray(c.messages) ? c.messages : []
+      msgs.forEach((m) => {
+        const jm = m as unknown as JsonMessage
+        if (!jm || typeof jm !== 'object') return
+        const createdVal = jm.createdAt
+        let dt: Date
+        if (createdVal instanceof Date) dt = createdVal
+        else if (typeof createdVal === 'string' || typeof createdVal === 'number') dt = new Date(createdVal)
+        else dt = new Date(c.createdAt)
+        if (!isNaN(dt.getTime()) && dt >= startOfDay && dt <= endOfDay) {
+          todayMessages += 1
         }
-      },
-      _sum: {
-        inputTokensUsed: true,
-        outputTokensUsed: true
-      }
+      })
     })
 
-    const monthlyTokensUsed = (monthlyUsage._sum?.inputTokensUsed || 0) + (monthlyUsage._sum?.outputTokensUsed || 0)
-    const monthlyTokenLimit = planLimits?.monthlyTokensLimit
+    // Tokens mensais indisponíveis sem UserUsage; definimos como 0 (placeholder)
+    const monthlyTokensUsed = 0
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       dailyMessages: {
         used: todayMessages,
-        limit: dailyLimit === -1 ? null : dailyLimit
+        limit: dailyLimit === -1 ? null : dailyLimit,
       },
       monthlyTokens: {
         used: monthlyTokensUsed,
-        limit: monthlyTokenLimit === -1 ? null : monthlyTokenLimit
+        limit: monthlyTokenLimit === -1 ? null : monthlyTokenLimit,
       },
       planType: user.planType,
-      remainingMessages: dailyLimit === null || dailyLimit === -1 ? null : Math.max(0, dailyLimit - todayMessages)
+      remainingMessages:
+        dailyLimit === null || dailyLimit === -1 ? null : Math.max(0, dailyLimit - todayMessages),
     })
-
-  } catch (error) {
-    console.error("Usage API error:", error)
-    return NextResponse.json(
-      { message: "Erro interno do servidor" },
-      { status: 500 }
-    )
-  }
+    setNoStore(res)
+    return res
+  })
 }

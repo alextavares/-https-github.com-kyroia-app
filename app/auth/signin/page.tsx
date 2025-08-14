@@ -1,169 +1,88 @@
 "use client"
 
-import { useState } from "react"
-import { signIn, getSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
-import { Github, Mail, AlertCircle, Loader2, CheckCircle } from "lucide-react"
 import { SocialLoginButtons } from "@/components/auth/social-login-buttons"
+import { useState } from "react"
+import { signIn } from "next-auth/react"
 
 export default function SignIn() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
-    setError("")
-    setSuccess(false)
-
+    setIsSubmitting(true)
+    setError(null)
     try {
-      const result = await signIn("credentials", {
+      const res = await signIn("credentials", {
         email,
         password,
-        redirect: false, // Vamos controlar o redirecionamento manualmente
-        callbackUrl: "/dashboard"
+        redirect: false,
       })
-
-      if (result?.error) {
-        // Mensagens de erro mais específicas
-        if (result.error === "CredentialsSignin") {
-          setError("Email ou senha incorretos. Verifique suas credenciais.")
-        } else {
-          setError("Erro ao fazer login. Tente novamente.")
-        }
-        setLoading(false)
-      } else if (result?.ok) {
-        // Sucesso - mostrar mensagem e redirecionar
-        setSuccess(true)
-        
-        // Aguardar um pouco para mostrar a mensagem de sucesso
-        setTimeout(async () => {
-          try {
-            // Verificar se a sessão foi criada
-            const session = await getSession()
-            if (session) {
-              // Usar window.location para forçar redirecionamento completo
-              window.location.replace("/dashboard")
-            } else {
-              // Se não há sessão, tentar novamente
-              setError("Erro na criação da sessão. Tente fazer login novamente.")
-              setLoading(false)
-              setSuccess(false)
-            }
-          } catch (sessionError) {
-            console.error("Erro ao verificar sessão:", sessionError)
-            // Tentar redirecionamento mesmo assim
-            window.location.replace("/dashboard")
-          }
-        }, 2000) // Aguardar 2 segundos para mostrar sucesso
+      if (res?.error) {
+        setError("Credenciais inválidas. Verifique seu email e senha.")
+        return
       }
-    } catch (error) {
-      console.error("Login error:", error)
-      setError("Erro de conexão. Verifique sua internet e tente novamente.")
-      setLoading(false)
+      window.location.href = "/dashboard"
+    } catch (err) {
+      setError("Falha ao entrar. Tente novamente.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-lg">
+      <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Entrar na sua conta</CardTitle>
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-xl flex items-center justify-center">
+              <span className="text-2xl font-bold text-white">IA</span>
+            </div>
+          </div>
+          <CardTitle className="text-2xl text-center">Entrar no Kyroia</CardTitle>
           <CardDescription className="text-center">
-            Entre com sua conta para acessar o InnerAI
+            Faça login usando sua conta Google/Apple ou email e senha
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* OAuth Providers */}
+          {/* OAuth Providers - apenas Google e Apple */}
           <SocialLoginButtons />
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Ou continue com email
-              </span>
-            </div>
+          <div className="relative my-2 text-center text-xs text-muted-foreground">
+            <span>ou</span>
           </div>
 
-          {/* Email/Password Form */}
-          <form data-testid="login-form" onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <Input
-                id="email" data-testid="email-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="seu@email.com"
-                disabled={loading || success}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Senha
-              </label>
-              <Input
-                id="password" data-testid="password-input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                disabled={loading || success}
-              />
-            </div>
-
+          <form onSubmit={handleEmailLogin} className="grid gap-3">
             {error && (
-              <Alert variant="destructive" className="mt-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <div className="text-red-600 text-sm">{error}</div>
             )}
-
-            {success && (
-              <Alert className="mt-4 border-green-200 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-600">
-                  Login realizado com sucesso! Redirecionando...
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Button
-              type="submit" data-testid="login-button"
-              disabled={loading || success}
-              className="w-full"
+            <input
+              type="email"
+              placeholder="Seu email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              required
+            />
+            <input
+              type="password"
+              placeholder="Sua senha"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              required
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-md bg-primary text-primary-foreground py-2 text-sm disabled:opacity-50"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Aguarde fazendo login...
-                </>
-              ) : success ? (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Login com sucesso
-                </>
-              ) : (
-                "Entrar"
-              )}
-            </Button>
+              {isSubmitting ? "Entrando..." : "Entrar com email"}
+            </button>
           </form>
 
           <div className="text-center text-sm">

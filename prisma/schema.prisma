@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x", "windows"]
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -9,229 +9,126 @@ datasource db {
 }
 
 model User {
-  id              String            @id @default(cuid())
-  email           String            @unique
-  name            String?
-  passwordHash    String?           @map("password_hash")
-  planType        String            @default("FREE") @map("plan_type")
-  creditBalance   Int               @default(0) @map("credit_balance")
-  profileImage    String?           @map("profile_image")
-  profession      String?
-  organization    String?
-  usageType       String?           @map("usage_type")
-  professionCategory String?        @map("profession_category")
-  phone           String?
-  onboardingCompleted Boolean       @default(false) @map("onboarding_completed")
-  isActive        Boolean           @default(true) @map("is_active")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
-  conversations   Conversation[]
-  payments        Payment[]
-  promptTemplates PromptTemplate[]
-  subscriptions   Subscription[]
-  toolUsage       ToolUsage[]
-  messageFeedback MessageFeedback[]
-  userUsage       UserUsage[]
-  templateFavorites TemplateFavorite[]
-  knowledgeBase   KnowledgeBase[]
-  creditTransactions CreditTransaction[]
-  accounts      Account[]
-  sessions      Session[]
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  name                 String?
+  password             String?
+  creditBalance        Int                   @default(1000)
+  planType             String?               @default("FREE")
+  onboardingCompleted  Boolean               @default(false)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  usageType            String?
+  professionCategory   String?
+  profileImage         String?
 
-  @@map("users")
+  conversations        Conversation[]
+  subscriptions        Subscription[]
+  creditTransactions   CreditTransaction[]
+  payments             Payment[]
+
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 }
 
-model Account {
-  id                 String  @id @default(cuid())
-  userId             String  @map("user_id")
-  type               String
-  provider           String
-  providerAccountId  String  @map("provider_account_id")
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+model Subscription {
+  id                 String    @id @default(cuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status             String    @default("ACTIVE")
+  plan               String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  // Provider references (optional uniques for idempotency per provider)
+  stripeSubscriptionId       String?  @unique
+  mercadoPagoPaymentId       String?  @unique
+  payments           Payment[]
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
+  @@index([userId, status])
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model CreditTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Int
+  type      String?
+  createdAt DateTime @default(now())
 
-  @@map("sessions")
+  @@index([userId, createdAt])
 }
 
 model Conversation {
   id         String    @id @default(cuid())
-  userId     String    @map("user_id")
-  title      String?
-  modelUsed  String?   @map("model_used")
-  isArchived Boolean   @default(false) @map("is_archived")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String?
+  modelUsed  String?
+  isArchived Boolean   @default(false)
   messages   Message[]
 
-  @@map("conversations")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, isArchived])
 }
 
 model Message {
-  id              String            @id @default(cuid())
-  conversationId  String            @map("conversation_id")
-  role            String            // "user", "assistant", "system"
-  content         String
-  tokensUsed      Int?              @map("tokens_used")
-  modelUsed       String?           @map("model_used")
-  metadata        String?           // JSON as string
-  createdAt       DateTime          @default(now()) @map("created_at")
-  conversation    Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  messageFeedback MessageFeedback[]
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  modelUsed      String?
+  tokensUsed     Int?
+  createdAt      DateTime     @default(now())
 
-  @@map("messages")
-}
-
-model PromptTemplate {
-  id              String         @id @default(cuid())
-  name            String
-  description     String?
-  category        String         // "CODING", "WRITING", "BUSINESS", etc.
-  templateContent String         @map("template_content")
-  variables       String?        // JSON as string
-  icon            String?
-  gradient        String?
-  tags            String         @default("[]") // JSON array as string
-  isPublic        Boolean        @default(true) @map("is_public")
-  isFeatured      Boolean        @default(false) @map("is_featured")
-  createdBy       String?        @map("created_by")
-  usageCount      Int            @default(0) @map("usage_count")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
-  creator         User?          @relation(fields: [createdBy], references: [id])
-  favorites       TemplateFavorite[]
-
-  @@map("prompt_templates")
-}
-
-model TemplateFavorite {
-  id         String         @id @default(cuid())
-  userId     String         @map("user_id")
-  templateId String         @map("template_id")
-  createdAt  DateTime       @default(now()) @map("created_at")
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  template   PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, templateId])
-  @@map("template_favorites")
-}
-
-model UserUsage {
-  id               String   @id @default(cuid())
-  userId           String   @map("user_id")
-  modelId          String   @map("model_id")
-  date             DateTime
-  messagesCount    Int      @default(0) @map("messages_count")
-  inputTokensUsed  Int      @default(0) @map("input_tokens_used")
-  outputTokensUsed Int      @default(0) @map("output_tokens_used")
-  costIncurred     Float    @default(0) @map("cost_incurred")
-  createdAt        DateTime @default(now()) @map("created_at")
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, modelId, date])
-  @@map("user_usage")
+  @@index([conversationId, createdAt])
 }
 
 model Payment {
-  id            String   @id @default(cuid())
-  userId        String   @map("user_id")
-  amount        Float
-  currency      String   @default("BRL")
-  status        String   // "PENDING", "COMPLETED", "FAILED", "REFUNDED"
-  paymentMethod String?  @map("payment_method")
-  transactionId String?  @map("transaction_id")
-  metadata      String?  // JSON as string
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String        @id @default(cuid())
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Optional relation to subscription when applicable
+  subscriptionId       String?
+  subscription         Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  amount               Float
+  currency             String?
+  status               String?
+  provider             String?
+  paymentMethod        String?
+  // Provider external references / idempotency keys
+  externalId           String?       @unique
+  mercadoPagoPaymentId String?       @unique
+  // Credits purchase linkage (optional – some flows use credit packages)
+  creditPackageId      String?
+  createdAt            DateTime      @default(now())
 
-  @@map("payments")
+  @@index([userId, createdAt])
 }
 
-model Subscription {
-  id                String   @id @default(cuid())
-  userId            String   @map("user_id")
-  planType          String   @map("plan_type")
-  status            String   // "ACTIVE", "CANCELLED", "EXPIRED", "PAST_DUE"
-  currentPeriodStart DateTime @map("current_period_start")
-  currentPeriodEnd   DateTime @map("current_period_end")
-  cancelAtPeriodEnd  Boolean  @default(false) @map("cancel_at_period_end")
-  stripeSubscriptionId String? @unique @map("stripe_subscription_id")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("subscriptions")
-}
-
-model ToolUsage {
+// Outbox/Log for MercadoPago webhooks (Transactional Outbox pattern)
+model MercadoPagoWebhookLog {
   id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  toolName  String   @map("tool_name")
-  usageData String?  @map("usage_data") // JSON as string
-  cost      Float    @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("tool_usage")
+  body      String
+  headers   String?
+  status    String   // PENDING | PROCESSED | FAILED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model MessageFeedback {
+// Catalog for credit packages used in some payment flows
+model CreditPackage {
   id        String   @id @default(cuid())
-  messageId String   @map("message_id")
-  userId    String   @map("user_id")
-  rating    Int      // 1-5 stars
-  feedback  String?
-  createdAt DateTime @default(now()) @map("created_at")
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId])
-  @@map("message_feedback")
-}
-
-model KnowledgeBase {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  title       String
-  content     String
-  type        String   // "DOCUMENT", "WEBPAGE", "TEXT", "FAQ"
-  metadata    String?  // JSON as string
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("knowledge_base")
-}
-
-model CreditTransaction {
-  id            String   @id @default(cuid())
-  userId        String   @map("user_id")
-  type          String   // "PURCHASE", "CONSUMPTION", "BONUS", "REFUND"
-  amount        Int
-  description   String?
-  relatedId     String?  @map("related_id")
-  createdAt     DateTime @default(now()) @map("created_at")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("credit_transactions")
+  name      String   @unique
+  credits   Int
+  price     Float
+  currency  String
+  planType  String?
+  createdAt DateTime @default(now())
 }

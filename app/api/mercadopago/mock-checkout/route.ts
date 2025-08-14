@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
             </div>
             
             <div class="pix-code">
-              00020126360014BR.GOV.BCB.PIX0114+5511999999999520400005303986540${plan === 'pro' ? '1.00' : '2.00'}5802BR5913InnerAI Test6009Sao Paulo62070503***6304B3CA
+              00020126360014BR.GOV.BCB.PIX0114+5511999999999520400005303986540${plan === 'pro' ? '1.00' : '2.00'}5802BR5913Kyroia Test6009Sao Paulo62070503***6304B3CA
             </div>
             
             <p style="color: #666; font-size: 14px;">

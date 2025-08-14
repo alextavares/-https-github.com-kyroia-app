@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago'
+import { normalizePaymentStatus, PaymentStatus } from '@/lib/constants/payment-status'
 
 // Initialize Stripe conditionally to avoid build-time errors
 let stripe: Stripe | null = null
@@ -7,7 +8,7 @@ let stripe: Stripe | null = null
 function getStripe(): Stripe {
   if (!stripe && process.env.STRIPE_SECRET_KEY) {
     stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2025-05-28.basil',
+      apiVersion: '2025-06-30.basil',
       typescript: true,
     })
   }
@@ -22,14 +23,19 @@ let mercadopagoClient: MercadoPagoConfig | null = null
 let mercadopagoPayment: Payment | null = null
 let mercadopagoPreference: Preference | null = null
 
+// MercadoPago typing helpers to ensure id is string where needed
+
 function initializeMercadoPago() {
-  if (!mercadopagoClient && process.env.MERCADOPAGO_ACCESS_TOKEN) {
-    mercadopagoClient = new MercadoPagoConfig({ 
-      accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
-      options: { timeout: 5000 }
-    })
-    mercadopagoPayment = new Payment(mercadopagoClient)
-    mercadopagoPreference = new Preference(mercadopagoClient)
+  if (!mercadopagoClient) {
+    const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN
+    if (accessToken) {
+      mercadopagoClient = new MercadoPagoConfig({ 
+        accessToken,
+        options: { timeout: 5000 }
+      })
+      mercadopagoPayment = new Payment(mercadopagoClient)
+      mercadopagoPreference = new Preference(mercadopagoClient)
+    }
   }
 }
 
@@ -184,7 +190,7 @@ export async function createCheckoutSession(params: CreateCheckoutParams) {
   if (params.paymentMethod === 'pix' || params.paymentMethod === 'boleto') {
     const isYearly = params.billingCycle === 'yearly'
     const price = isYearly ? (plan.price * 12 * 0.4) : plan.price // 60% discount for yearly
-    const title = isYearly ? `Plano ${plan.name} Anual - InnerAI` : `Plano ${plan.name} - InnerAI`
+    const title = isYearly ? `Plano ${plan.name} Anual - Kyroia` : `Plano ${plan.name} - Kyroia`
     
     const preference = await getMercadoPagoPreference().create({
       body: {
@@ -304,7 +310,11 @@ async function retryPaymentFetch(paymentId: string, maxRetries = 3, delay = 2000
         payment_type_id: payment.payment_type_id,
         external_reference: payment.external_reference
       })
-      return payment
+      return {
+        // Preserve known properties structurally while normalizing id to string
+        ...(payment as unknown as Record<string, unknown>),
+        id: String((payment as unknown as { id?: string | number }).id ?? ''),
+      } as MercadoPagoPaymentResponse
     } catch (error: unknown) {
       console.log(`[MercadoPago] Attempt ${attempt} failed:`, error instanceof Error ? error.message : String(error))
       
@@ -338,35 +348,36 @@ export async function handleMercadoPagoWebhook(data: MercadoPagoWebhookData) {
   if (data.topic === 'payment') {
     try {
       const payment = await retryPaymentFetch(data.id)
-      
-      console.log(`[MercadoPago] Payment status: ${payment.status}`)
-      
-      // Handle both approved and pending payments
-      if (payment.status === 'approved' || payment.status === 'pending') {
+      const newStatus = normalizePaymentStatus(payment.status)
+
+      console.log(`[MercadoPago] Payment status: ${payment.status} -> ${newStatus}`)
+
+      // Handle completed and pending payments
+      if (newStatus === PaymentStatus.COMPLETED || newStatus === PaymentStatus.PENDING) {
         // Parse external_reference if it's a JSON string
         let parsedRef: Record<string, unknown> = {}
         try {
-          parsedRef = JSON.parse(payment.external_reference || '{}')
+          parsedRef = JSON.parse(String(payment.external_reference ?? '{}'))
         } catch {
           console.error('[MercadoPago] Failed to parse external_reference:', payment.external_reference)
         }
 
-        console.log(`[MercadoPago] Processing payment ${payment.id} with status ${payment.status}`)
+        console.log(`[MercadoPago] Processing payment ${payment.id} with status ${newStatus}`)
         console.log(`[MercadoPago] Payment type: ${payment.payment_type_id || 'unknown'}`)
         console.log(`[MercadoPago] External reference:`, parsedRef)
 
         return {
           userId: parsedRef.userId || payment.external_reference,
-          planId: parsedRef.planId || payment.metadata?.plan_id,
+          planId: parsedRef.planId || (payment as unknown as { metadata?: Record<string, unknown> }).metadata?.['plan_id'] as string | undefined,
           paymentId: payment.id,
-          status: payment.status,
-          billingCycle: parsedRef.billingCycle || payment.metadata?.billing_cycle || 'monthly'
+          status: payment.status, // preserve provider raw for legacy callers
+          billingCycle: (parsedRef.billingCycle || (payment as unknown as { metadata?: Record<string, unknown> }).metadata?.['billing_cycle'] || 'monthly') as string
         }
       } else {
-        // Return status for rejected/failed payments for logging
+        // Return status for failed/refunded payments for logging
         let parsedRef: Record<string, unknown> = {}
         try {
-          parsedRef = JSON.parse(payment.external_reference || '{}')
+          parsedRef = JSON.parse(String(payment.external_reference ?? '{}'))
         } catch {
           console.error('[MercadoPago] Failed to parse external_reference:', payment.external_reference)
         }
@@ -375,10 +386,10 @@ export async function handleMercadoPagoWebhook(data: MercadoPagoWebhookData) {
 
         return {
           userId: parsedRef.userId || payment.external_reference,
-          planId: parsedRef.planId || payment.metadata?.plan_id,
+          planId: parsedRef.planId || (payment as unknown as { metadata?: Record<string, unknown> }).metadata?.['plan_id'] as string | undefined,
           paymentId: payment.id,
-          status: payment.status,
-          billingCycle: parsedRef.billingCycle || payment.metadata?.billing_cycle || 'monthly'
+          status: payment.status, // preserve provider raw for legacy callers
+          billingCycle: (parsedRef.billingCycle || (payment as unknown as { metadata?: Record<string, unknown> }).metadata?.['billing_cycle'] || 'monthly') as string
         }
       }
     } catch (error) {

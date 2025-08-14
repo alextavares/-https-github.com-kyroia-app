@@ -124,20 +124,32 @@ export class APIKeyManager {
 
   // Encrypt API key for storage
   private static encryptKey(key: string): string {
-    const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey)
-    let encrypted = cipher.update(key, 'utf8', 'hex')
-    encrypted += cipher.final('hex')
-    return encrypted
+    const algorithm = 'aes-256-cbc'
+    // Derive a 32-byte key from the provided encryptionKey
+    const derivedKey = crypto.createHash('sha256').update(this.encryptionKey).digest()
+    // IV must be 16 bytes for aes-256-cbc
+    const iv = crypto.randomBytes(16)
+    const cipher = crypto.createCipheriv(algorithm, derivedKey, iv)
+    const encrypted = Buffer.concat([cipher.update(key, 'utf8'), cipher.final()])
+    // Store IV + ciphertext in hex
+    return iv.toString('hex') + ':' + encrypted.toString('hex')
   }
 
   // Decrypt API key for use
   private static decryptKey(encryptedKey: string): string {
     try {
-      const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey)
-      let decrypted = decipher.update(encryptedKey, 'hex', 'utf8')
-      decrypted += decipher.final('utf8')
-      return decrypted
-    } catch (error) {
+      const algorithm = 'aes-256-cbc'
+      const derivedKey = crypto.createHash('sha256').update(this.encryptionKey).digest()
+      const [ivHex, dataHex] = encryptedKey.split(':')
+      if (!ivHex || !dataHex) {
+        throw new Error('Invalid encrypted payload format')
+      }
+      const iv = Buffer.from(ivHex, 'hex')
+      const ciphertext = Buffer.from(dataHex, 'hex')
+      const decipher = crypto.createDecipheriv(algorithm, derivedKey, iv)
+      const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+      return decrypted.toString('utf8')
+    } catch {
       throw new Error('Failed to decrypt API key')
     }
   }
@@ -168,7 +180,7 @@ export class APIKeyManager {
 
     try {
       const headers: Record<string, string> = {
-        'User-Agent': 'InnerAI/1.0'
+        'User-Agent': 'Kyroia/1.0'
       }
 
       // Set authorization header based on provider
@@ -190,11 +202,14 @@ export class APIKeyManager {
         ? `${config.testEndpoint}?key=${key}`
         : config.testEndpoint
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        timeout: 10000
-      })
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId))
 
       if (response.ok) {
         const data = await response.json()
@@ -401,5 +416,5 @@ export class APIKeyManager {
   }
 }
 
-export { APIKeyManager, APIKeySchema }
-export type { APIKey, ProviderConfig }
+/* removed duplicate re-exports to avoid conflicts */
+export { APIKeySchema }

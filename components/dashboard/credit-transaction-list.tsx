@@ -13,7 +13,8 @@ import {
   Mic,
   Gift,
   RefreshCw,
-  ChevronRight
+  ChevronRight,
+  History
 } from 'lucide-react'
 
 interface CreditTransaction {

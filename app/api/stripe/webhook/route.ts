@@ -4,24 +4,24 @@ import { prisma } from '@/lib/prisma'
 import { handleStripeWebhook } from '@/lib/payment-service'
 import { stripe } from '@/lib/stripe'
 import type Stripe from 'stripe'
-import { SubscriptionStatus, PlanType } from '@prisma/client' // Import Prisma enums
+import { PaymentStatus } from '@/lib/constants/payment-status'
 
 // Helper function to map Stripe subscription status to internal status
-function mapStripeStatusToSubscriptionStatus(stripeStatus: Stripe.Subscription.Status): SubscriptionStatus {
+function mapStripeStatusToSubscriptionStatus(stripeStatus: Stripe.Subscription.Status): string {
   switch (stripeStatus) {
     case 'active':
     case 'trialing':
-      return SubscriptionStatus.ACTIVE
+      return 'ACTIVE'
     case 'past_due':
-      return SubscriptionStatus.PAST_DUE
+      return 'PAST_DUE'
     case 'canceled':
     case 'unpaid': // unpaid often leads to canceled
     case 'incomplete_expired': // incomplete_expired means it was never completed
-      return SubscriptionStatus.CANCELLED
+      return 'CANCELED'
     case 'incomplete': // Incomplete might not have a direct mapping yet or could be PENDING if we add it
-      return SubscriptionStatus.CANCELLED // For now, map to CANCELLED as it's not active
+      return 'CANCELED' // Not active
     default:
-      return SubscriptionStatus.CANCELLED // Default to CANCELLED for unknown statuses
+      return 'CANCELED'
   }
 }
 
@@ -55,12 +55,11 @@ async function handleMockWebhook(event: any) {
     await prisma.subscription.create({
       data: {
         userId: mockResult.userId,
-        planType: mockResult.planId.toUpperCase() as any,
+        plan: mockResult.planId.toUpperCase(),
         status: 'ACTIVE',
         stripeSubscriptionId: mockResult.subscriptionId,
-        stripeCustomerId: mockResult.customerId,
-          startedAt: startDate,
-          expiresAt: expiresDate
+        currentPeriodStart: startDate,
+        currentPeriodEnd: expiresDate,
       }
     })
   }
@@ -110,7 +109,7 @@ export async function POST(request: NextRequest) {
         // Update user's plan
         await prisma.user.update({
           where: { id: result.userId },
-          data: { planType: result.planId.toUpperCase() as any }
+          data: { planType: result.planId.toUpperCase() }
         })
 
         // Handle existing active subscriptions before creating a new one
@@ -131,7 +130,7 @@ export async function POST(request: NextRequest) {
           if (sub.stripeSubscriptionId !== result.subscriptionId as string) {
             await prisma.subscription.update({
               where: { id: sub.id },
-              data: { status: 'CANCELLED', expiresAt: new Date() } // Optionally set expiresAt to now
+              data: { status: 'CANCELED', currentPeriodEnd: new Date() }
             })
           }
         }
@@ -140,45 +139,43 @@ export async function POST(request: NextRequest) {
         await prisma.subscription.create({
           data: {
             userId: result.userId,
-            planType: result.planId.toUpperCase() as any,
+            plan: result.planId.toUpperCase(),
             status: 'ACTIVE',
             stripeSubscriptionId: result.subscriptionId as string,
-            stripeCustomerId: result.customerId as string,
-            startedAt: startDate,
-            expiresAt: expiresDate
+            currentPeriodStart: startDate,
+            currentPeriodEnd: expiresDate,
           }
         })
 
         // Create payment record
-        const amount = result.planId === 'pro' ? 47 : 197 // This amount logic might need to be more dynamic based on plan
+        const amount = result.planId === 'pro' ? 47 : 197 // TODO: derive from product/pricing
         await prisma.payment.create({
           data: {
             userId: result.userId,
             amount,
             currency: 'BRL',
-            status: 'COMPLETED',
-            stripePaymentId: (session as any).payment_intent || `pi_${Date.now()}`
+            status: PaymentStatus.COMPLETED,
+            provider: 'stripe',
+            paymentMethod: 'card',
+            externalId: (session as any).payment_intent || `pi_${Date.now()}`
           }
         })
       } else if (event.type === 'customer.subscription.updated') {
         const stripeSubscription = event.data.object as Stripe.Subscription
         const newStatus = mapStripeStatusToSubscriptionStatus(stripeSubscription.status)
 
-        const dataToUpdate: any = {
-          status: newStatus,
-        }
+        const dataToUpdate: any = { status: newStatus }
 
         if (stripeSubscription.cancel_at_period_end && stripeSubscription.status === 'active') {
           // Subscription is set to cancel at period end, but still active.
           // Update expiresAt to current_period_end. User retains access.
-          dataToUpdate.expiresAt = new Date((stripeSubscription as any).current_period_end * 1000)
-          // Status remains ACTIVE until Stripe sends a new event when it's actually cancelled.
-          dataToUpdate.status = SubscriptionStatus.ACTIVE
+          dataToUpdate.currentPeriodEnd = new Date((stripeSubscription as any).current_period_end * 1000)
+          dataToUpdate.status = 'ACTIVE'
         } else {
            // For other status updates, if Stripe provides a current_period_end, use it.
            // This can be relevant if a subscription reactivates or changes.
            if ((stripeSubscription as any).current_period_end) {
-             dataToUpdate.expiresAt = new Date((stripeSubscription as any).current_period_end * 1000);
+             dataToUpdate.currentPeriodEnd = new Date((stripeSubscription as any).current_period_end * 1000);
            }
         }
 
@@ -187,15 +184,15 @@ export async function POST(request: NextRequest) {
           data: dataToUpdate,
         })
 
-        // If the new status is not ACTIVE (e.g., CANCELLED, PAST_DUE), downgrade user
+        // If the new status is not ACTIVE (e.g., CANCELED, PAST_DUE), downgrade user
         // Consider if PAST_DUE should immediately downgrade or have a grace period.
         // For now, any non-ACTIVE status (after considering cancel_at_period_end) leads to FREE.
         const effectiveStatusForDowngrade = dataToUpdate.status;
 
-        if (effectiveStatusForDowngrade !== SubscriptionStatus.ACTIVE && stripeSubscription.metadata?.userId) {
+        if (effectiveStatusForDowngrade !== 'ACTIVE' && stripeSubscription.metadata?.userId) {
           await prisma.user.update({
             where: { id: stripeSubscription.metadata.userId },
-            data: { planType: PlanType.FREE },
+            data: { planType: 'FREE' },
           })
         }
 
@@ -204,15 +201,15 @@ export async function POST(request: NextRequest) {
         await prisma.subscription.updateMany({
           where: { stripeSubscriptionId: stripeSubscription.id },
           data: {
-            status: SubscriptionStatus.CANCELLED,
-            expiresAt: new Date(), // Expires now as it's deleted
+            status: 'CANCELED',
+            currentPeriodEnd: new Date(),
           },
         })
 
         if (stripeSubscription.metadata?.userId) {
           await prisma.user.update({
             where: { id: stripeSubscription.metadata.userId },
-            data: { planType: PlanType.FREE },
+            data: { planType: 'FREE' },
           })
         }
       }

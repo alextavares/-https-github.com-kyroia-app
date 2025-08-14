@@ -1,154 +1,73 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
+import { handleRoute } from '@/lib/http/errors'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+// GET /api/dashboard/stats
+// Padrão: handleRoute + requireAuth + setNoStore
+// Métricas derivadas do schema atual:
+// - Conversation.messages: Json[] (contagem de mensagens)
+// - Payment: total de pagamentos do usuário
+// - lastActivityAt: maior createdAt entre conversas e pagamentos
+export const GET = handleRoute(async () => {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.error
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+  // Carrega conversas e pagamentos recentes (limite para performance)
+  const [conversations, payments] = await Promise.all([
+    prisma.conversation.findMany({
+      where: { userId: auth.userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, messages: true },
+      take: 500,
+    }),
+    prisma.payment.findMany({
+      where: { userId: auth.userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, amount: true, status: true },
+      take: 200,
+    }),
+  ])
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+  // Conversas e mensagens
+  const totalConversations = conversations.length
+  const totalMessages = conversations.reduce((acc, c) => {
+    const arr = Array.isArray(c.messages) ? c.messages : []
+    return acc + arr.length
+  }, 0)
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+  // Pagamentos
+  const totalPayments = payments.length
 
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  // Última atividade
+  const lastConvAt = conversations[0]?.createdAt ?? null
+  const lastPayAt = payments[0]?.createdAt ?? null
+  const lastActivityAt =
+    lastConvAt && lastPayAt
+      ? new Date(Math.max(lastConvAt.getTime(), lastPayAt.getTime())).toISOString()
+      : (lastConvAt ?? lastPayAt)?.toISOString() ?? null
 
-    // Get today's usage
-    const todayUsage = await prisma.userUsage.aggregate({
-      where: {
-        userId: user.id,
-        date: {
-          gte: today
-        }
-      },
-      _sum: {
-        messagesCount: true,
-        inputTokensUsed: true,
-        outputTokensUsed: true,
-        costIncurred: true
-      }
-    })
-
-    // Get this month's usage
-    const monthUsage = await prisma.userUsage.aggregate({
-      where: {
-        userId: user.id,
-        date: {
-          gte: startOfMonth
-        }
-      },
-      _sum: {
-        messagesCount: true,
-        inputTokensUsed: true,
-        outputTokensUsed: true,
-        costIncurred: true
-      }
-    })
-
-    // Get daily usage for the last 7 days
-    const sevenDaysAgo = new Date(today)
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-    const dailyUsage = await prisma.userUsage.findMany({
-      where: {
-        userId: user.id,
-        date: {
-          gte: sevenDaysAgo
-        }
-      },
-      orderBy: {
-        date: 'asc'
-      },
-      select: {
-        date: true,
-        messagesCount: true,
-        inputTokensUsed: true,
-        outputTokensUsed: true,
-        costIncurred: true
-      }
-    })
-
-    // Get usage by model
-    const modelUsage = await prisma.userUsage.groupBy({
-      by: ['modelId'],
-      where: {
-        userId: user.id,
-        date: {
-          gte: startOfMonth
-        }
-      },
-      _sum: {
-        messagesCount: true,
-        inputTokensUsed: true,
-        outputTokensUsed: true,
-        costIncurred: true
-      },
-      orderBy: {
-        _sum: {
-          messagesCount: 'desc'
-        }
-      }
-    })
-
-    // Get model names
-    const modelNames = await prisma.aIModel.findMany({
-      where: {
-        id: {
-          in: modelUsage.map(usage => usage.modelId)
-        }
-      },
-      select: {
-        id: true,
-        name: true
-      }
-    })
-
-    const modelMap = Object.fromEntries(
-      modelNames.map(model => [model.id, model.name])
-    )
-
-    const response = {
-      today: {
-        messages: todayUsage._sum.messagesCount || 0,
-        tokens: (todayUsage._sum.inputTokensUsed || 0) + (todayUsage._sum.outputTokensUsed || 0),
-        cost: Number(todayUsage._sum.costIncurred || 0)
-      },
-      thisMonth: {
-        messages: monthUsage._sum.messagesCount || 0,
-        tokens: (monthUsage._sum.inputTokensUsed || 0) + (monthUsage._sum.outputTokensUsed || 0),
-        cost: Number(monthUsage._sum.costIncurred || 0)
-      },
-      dailyUsage: dailyUsage.map(day => ({
-        date: day.date.toISOString().split('T')[0],
-        messages: day.messagesCount,
-        tokens: day.inputTokensUsed + day.outputTokensUsed,
-        cost: Number(day.costIncurred)
+  const res = Response.json({
+    totals: {
+      conversations: totalConversations,
+      messages: totalMessages,
+      payments: totalPayments,
+    },
+    lastActivityAt,
+    recent: {
+      conversations: conversations.slice(0, 10).map((c) => ({
+        id: c.id,
+        createdAt: c.createdAt.toISOString(),
+        messagesCount: Array.isArray(c.messages) ? c.messages.length : 0,
       })),
-      modelUsage: modelUsage.map(usage => ({
-        model: modelMap[usage.modelId] || usage.modelId,
-        messages: usage._sum.messagesCount || 0,
-        tokens: (usage._sum.inputTokensUsed || 0) + (usage._sum.outputTokensUsed || 0),
-        cost: Number(usage._sum.costIncurred || 0)
-      }))
-    }
-
-    return NextResponse.json(response)
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch stats' },
-      { status: 500 }
-    )
-  }
-}
+      payments: payments.slice(0, 10).map((p) => ({
+        id: p.id,
+        createdAt: p.createdAt.toISOString(),
+        amount: p.amount,
+        status: p.status,
+      })),
+    },
+  })
+  setNoStore(res)
+  return res
+})

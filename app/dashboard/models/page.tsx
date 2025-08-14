@@ -211,7 +211,7 @@ export default function ModelsPage() {
       </div>
 
       {/* Category Tabs */}
-      <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
+      <Tabs value={selectedCategory} onValueChange={(v) => setSelectedCategory(v as any)}>
         <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 8)}, minmax(0, 1fr))` }}>
           {categories.map((category) => (
             <TabsTrigger key={category} value={category}>

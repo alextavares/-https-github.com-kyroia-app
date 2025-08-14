@@ -1,56 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { CreditService } from '@/lib/credit-service'
+import { NextRequest } from 'next/server'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
+import { handleRoute } from '@/lib/http/errors'
+import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+
+// GET /api/credits/history
+// Padrão: handleRoute + requireAuth + setNoStore, paginação por query (page/pageSize), ordenação por createdAt desc
+const querySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(10),
+})
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = Response.json({ error: 'Não autorizado' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
-    const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit') || '50')
-    const offset = parseInt(url.searchParams.get('offset') || '0')
-    const type = url.searchParams.get('type') // 'all', 'purchase', 'consumption'
+    const query = Object.fromEntries(new URL(request.url).searchParams.entries())
+    const parsed = querySchema.safeParse(query)
+    if (!parsed.success) {
+      const res = Response.json({ error: 'Parâmetros de paginação inválidos', issues: parsed.error.issues }, { status: 400 })
+      setNoStore(res)
+      return res
+    }
+    const { page, pageSize } = parsed.data
 
-    // Get transaction history from database
-    const transactions = await CreditService.getTransactionHistory(
-      session.user.id,
-      limit,
-      offset
-    )
-    
-    // Filter by type if specified
-    const filteredTransactions = type && type !== 'all' 
-      ? transactions.filter(t => {
-          if (type === 'purchase') return ['PURCHASE', 'BONUS'].includes(t.type)
-          if (type === 'consumption') return t.type === 'CONSUMPTION'
-          return true
-        })
-      : transactions
-    
-    // Get monthly stats from database
-    const monthlyStats = await CreditService.getMonthlyStats(session.user.id)
-    
-    // Get user credit statistics
-    const userStats = await CreditService.getUserCreditStats(session.user.id)
-    
-    return NextResponse.json({
-      transactions: filteredTransactions,
-      monthlyStats,
-      userStats,
-      pagination: {
-        limit,
-        offset,
-        hasMore: transactions.length === limit,
-        total: filteredTransactions.length
-      }
+    const [items, total] = await Promise.all([
+      prisma.payment.findMany({
+        where: { userId: auth.userId },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          status: true,
+          amount: true,
+          currency: true,
+          createdAt: true,
+          creditPackageId: true,
+        },
+      }),
+      prisma.payment.count({
+        where: { userId: auth.userId },
+      }),
+    ])
+
+    const res = Response.json({
+      items,
+      page,
+      pageSize,
+      total,
     })
-  } catch (error) {
-    console.error('Error fetching credit history:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
+    setNoStore(res)
+    return res
+  })
 }

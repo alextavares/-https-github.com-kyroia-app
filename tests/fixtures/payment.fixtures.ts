@@ -217,6 +217,10 @@ export const mockWebhookEvents = {
   },
 };
 
+// Compatibility exports expected by tests
+export const mockStripeWebhookEvents = mockWebhookEvents.stripe;
+export const mockMercadoPagoWebhookEvents = mockWebhookEvents.mercadopago;
+
 // Mock payment service
 export class MockPaymentService {
   async createCheckoutSession(userId: string, planId: string) {

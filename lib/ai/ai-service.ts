@@ -3,8 +3,24 @@ import { OpenRouterProvider } from './openrouter-provider'
 import { AIProvider, AIMessage, AIResponse, AIModel } from './types'
 import { INNERAI_MODELS, getModelsForPlan, getModelById } from './innerai-models-config'
 
+// Tipo mínimo para os modelos da configuração Kyroia (fora da classe)
+type KyroiaModelConfig = {
+  id: string
+  name: string
+  provider: 'openai' | 'anthropic' | 'openrouter' | string
+  contextWindow: number
+  costPer1kTokens: { input: number; output: number }
+  features: string[]
+  category: string
+  planRequired: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'
+  isAvailable: boolean
+  maxTokens?: number
+}
+
 class AIService {
   private providers: Map<string, AIProvider> = new Map()
+  // Modelo padrão preferindo OpenRouter (ID do catálogo interno)
+  private readonly defaultModel = 'gpt-4o-mini'
 
   constructor() {
     // Initialize providers
@@ -22,7 +38,7 @@ class AIService {
 
   async generateResponse(
     messages: AIMessage[],
-    model: string,
+    model: string = this.defaultModel,
     options?: {
       maxTokens?: number
       temperature?: number
@@ -32,10 +48,13 @@ class AIService {
     console.log(`[AIService] Generating response for model: ${model}`)
     
     try {
+      const modelForProvider = model.startsWith('openrouter/')
+        ? model.replace(/^openrouter\//, '')
+        : model
       // Primeiro, tentar o provider específico para o modelo
       const provider = this.getProviderForModel(model)
       console.log(`[AIService] Using provider: ${provider.id}`)
-      return await provider.generateResponse(messages, model, options)
+      return await provider.generateResponse(messages, modelForProvider, options)
       
     } catch (error) {
       console.warn(`[AIService] Primary provider failed:`, error)
@@ -58,7 +77,7 @@ class AIService {
 
   async streamResponse(
     messages: AIMessage[],
-    model: string,
+    model: string = this.defaultModel,
     options?: {
       maxTokens?: number
       temperature?: number
@@ -68,12 +87,15 @@ class AIService {
     if (!provider.streamResponse) {
       throw new Error(`Streaming not supported for model ${model}`)
     }
-    return provider.streamResponse(messages, model, options)
+    const modelForProvider = model.startsWith('openrouter/')
+      ? model.replace(/^openrouter\//, '')
+      : model
+    return provider.streamResponse(messages, modelForProvider, options)
   }
 
   async streamResponseWithCallbacks(
     messages: AIMessage[],
-    model: string,
+    model: string = this.defaultModel,
     options: {
       maxTokens?: number
       temperature?: number
@@ -124,41 +146,57 @@ class AIService {
   }
 
   getAllAvailableModels(): AIModel[] {
-    // Usar a configuração exata do InnerAI
-    return INNERAI_MODELS.filter(model => model.isAvailable).map(model => ({
-      id: model.id,
-      name: model.name,
-      provider: model.provider,
-      contextLength: model.contextWindow,
-      costPerInputToken: model.costPer1kTokens.input / 1000,
-      costPerOutputToken: model.costPer1kTokens.output / 1000,
-      features: model.features,
-      category: model.category,
-      planRequired: model.planRequired
-    }))
+    // Usar a configuração exata do Kyroia
+    return (INNERAI_MODELS as KyroiaModelConfig[])
+      .filter((model) => model.isAvailable)
+      .map((model) => ({
+        id: model.id,
+        name: model.name,
+        provider: (model.provider as 'openai' | 'anthropic' | 'openrouter'),
+        contextLength: model.contextWindow,
+        costPerInputToken: model.costPer1kTokens.input / 1000,
+        costPerOutputToken: model.costPer1kTokens.output / 1000,
+        features: model.features,
+        category: model.category,
+        planRequired: model.planRequired,
+        // Ajuste para satisfazer AIModel: incluir maxTokens
+        maxTokens: model.maxTokens ?? model.contextWindow
+      }))
   }
 
   getModelsForPlan(planType: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'): AIModel[] {
-    // Usar a função da configuração exata do InnerAI
-    return getModelsForPlan(planType).map(model => ({
+    // Usar a função da configuração exata do Kyroia
+    return (getModelsForPlan(planType) as KyroiaModelConfig[]).map((model) => ({
       id: model.id,
       name: model.name,
-      provider: model.provider,
+      provider: (model.provider as 'openai' | 'anthropic' | 'openrouter'),
       contextLength: model.contextWindow,
       costPerInputToken: model.costPer1kTokens.input / 1000,
       costPerOutputToken: model.costPer1kTokens.output / 1000,
       features: model.features,
       category: model.category,
-      planRequired: model.planRequired
+      planRequired: model.planRequired,
+      // Ajuste para satisfazer AIModel: incluir maxTokens
+      maxTokens: model.maxTokens ?? model.contextWindow
     }))
   }
 
   private getProviderForModel(model: string): AIProvider {
-    // Buscar modelo na configuração do InnerAI
-    const innerAIModel = getModelById(model)
+    // Permitir o ID direto do OpenRouter como atalho (ex.: 'openrouter/horizon-beta')
+    if (model.startsWith('openrouter/')) {
+      const openRouterProvider = this.getProvider('openrouter')
+      if (openRouterProvider.isConfigured()) return openRouterProvider
+      throw new Error(`No configured provider found for model: ${model}`)
+    }
+
+    // Normalizar ID para busca no catálogo interno (remove prefixos como 'openai/' ou 'anthropic/')
+    const lookupId = model.includes('/') ? model.split('/').pop() as string : model
+
+    // Buscar modelo na configuração do Kyroia
+    const innerAIModel = getModelById(lookupId)
     
     if (!innerAIModel) {
-      throw new Error(`Model ${model} not found in InnerAI configuration`)
+      throw new Error(`Model ${model} not found in Kyroia configuration`)
     }
     
     if (!innerAIModel.isAvailable) {
@@ -168,7 +206,7 @@ class AIService {
     // Usar OpenRouter para todos os modelos exceto modelos nativos da OpenAI
     const nativeOpenAIModels = ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo']
     
-    if (nativeOpenAIModels.includes(model)) {
+    if (nativeOpenAIModels.includes(lookupId)) {
       // Tentar OpenAI primeiro, fallback para OpenRouter
       const openaiProvider = this.getProvider('openai')
       if (openaiProvider.isConfigured()) {

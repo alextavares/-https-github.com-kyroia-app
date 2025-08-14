@@ -38,8 +38,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('[Debug User] Error:', error)
+    const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { error: error.message },
+      { error: message },
       { status: 500 }
     )
   }

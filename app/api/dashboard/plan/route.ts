@@ -1,48 +1,92 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth/guards'
+import { setPrivateCache } from '@/lib/cache/headers'
+import { handleRoute, DomainError } from '@/lib/http/errors'
 import { prisma } from '@/lib/prisma'
+import { CreditsService } from '@/services/credits'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+// GET /api/dashboard/plan
+// Padrão: handleRoute + requireAuth + setPrivateCache
+// Retorna visão do plano atual, saldo de créditos e recomendações de upgrade
+export const GET = handleRoute(async () => {
+  const auth = await requireAuth()
+  if (!auth.ok) return auth.error
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+  // Limites padrão por plano (schema atual sem tabela planLimit)
+  const DEFAULT_LIMITS = {
+    FREE: {
+      dailyMessagesLimit: 20,
+      monthlyTokensLimit: 200_000,
+      featuresEnabled: [] as string[],
+      recommendedMinCredits: 50,
+    },
+    PRO: {
+      dailyMessagesLimit: 500,
+      monthlyTokensLimit: 5_000_000,
+      featuresEnabled: ['prioritySupport', 'higherLimits'] as string[],
+      recommendedMinCredits: 200,
+    },
+    BUSINESS: {
+      dailyMessagesLimit: 5000,
+      monthlyTokensLimit: 50_000_000,
+      featuresEnabled: ['prioritySupport', 'team', 'sso'] as string[],
+      recommendedMinCredits: 1000,
+    },
+  } as const
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+    select: { id: true, planType: true },
+  })
 
-    // Get plan limits
-    const planLimits = await prisma.planLimit.findUnique({
-      where: {
-        planType: user.planType
-      }
-    })
+  if (!user) {
+    throw new DomainError('NOT_FOUND', 'Usuário não encontrado')
+  }
 
-    if (!planLimits) {
-      return NextResponse.json({ error: 'Plan not found' }, { status: 404 })
-    }
+  const planKey = (user.planType as keyof typeof DEFAULT_LIMITS) ?? 'FREE'
+  const planLimits = DEFAULT_LIMITS[planKey]
+  if (!planLimits) {
+    throw new DomainError('NOT_FOUND', 'Plano não encontrado')
+  }
 
-    const response = {
+  // Saldo de créditos atual
+  const balance = await CreditsService.getUserBalance(user.id)
+  const isLowBalance = balance < planLimits.recommendedMinCredits
+
+  // Pacotes disponíveis para recomendação
+  // Nota: modelo CreditPackage não possui campo "active" no schema atual
+  const packages = await prisma.creditPackage.findMany({
+    orderBy: { credits: 'asc' },
+    select: { id: true, name: true, credits: true, price: true },
+    take: 5,
+  })
+
+  // Estratégia simples de recomendação baseada no saldo
+  const recommendations = isLowBalance
+    ? packages.slice(0, 3).map((p) => ({
+        packageId: p.id,
+        name: p.name,
+        credits: p.credits,
+        price: p.price,
+        reason: `Saldo baixo (${balance}) — adquira ${p.credits} créditos`,
+      }))
+    : []
+
+  const res = Response.json({
+    plan: {
       type: user.planType,
       dailyLimit: planLimits.dailyMessagesLimit,
       monthlyLimit: planLimits.monthlyTokensLimit,
-      features: planLimits.featuresEnabled as string[]
-    }
-
-    return NextResponse.json(response)
-  } catch (error) {
-    console.error('Error fetching plan info:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch plan info' },
-      { status: 500 }
-    )
-  }
-}
+      features: planLimits.featuresEnabled,
+    },
+    credits: {
+      balance,
+      currency: 'CREDITS',
+      isLowBalance,
+      recommendedMin: planLimits.recommendedMinCredits,
+    },
+    recommendations,
+    packages, // opcional, útil para UI montar a vitrine
+  })
+  setPrivateCache(res, 60) // cache privado curto para melhorar UX sem vazar dados
+  return res
+})

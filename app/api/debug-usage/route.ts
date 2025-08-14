@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { checkUsageLimits, getUserUsageStats, PLAN_LIMITS } from "@/lib/usage-limits"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Testar checkUsageLimits para diferentes modelos
-    const modelTests = {}
+    const modelTests: Record<string, Awaited<ReturnType<typeof checkUsageLimits>>> = {}
     const testModels = [
       'gpt-4o-mini',
       'gpt-4o',
@@ -53,14 +53,14 @@ export async function GET(request: NextRequest) {
     ]
 
     for (const model of testModels) {
-      modelTests[model] = await checkUsageLimits(user.id, model)
+      modelTests[String(model)] = await checkUsageLimits(user.id, String(model))
     }
 
     // Obter estatísticas
     const stats = await getUserUsageStats(user.id)
 
     // Limites do plano
-    const planLimits = PLAN_LIMITS[user.planType]
+    const planLimits = PLAN_LIMITS[user.planType as import('@/lib/usage-limits').PlanType]
 
     return NextResponse.json({
       user: {
@@ -80,12 +80,13 @@ export async function GET(request: NextRequest) {
       }
     })
 
-  } catch (error: any) {
-    console.error("[Debug Usage API] Error:", error)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error("[Debug Usage API] Error:", message)
     return NextResponse.json(
       { 
         message: "Erro ao buscar dados de uso",
-        error: error.message
+        error: message
       },
       { status: 500 }
     )

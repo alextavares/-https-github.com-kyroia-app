@@ -1,14 +1,15 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Check, Coins, Star, Crown, X, ArrowLeft } from 'lucide-react'
+import { Coins, Star, Crown, X } from 'lucide-react'
 import Link from 'next/link'
 import { CreditService } from '@/lib/credit-service'
+import { prisma } from '@/lib/prisma'
+import { AnchorHighlighter } from '@/components/dashboard/anchor-highlighter'
+import { CreditPackageCardClient } from '@/components/dashboard/credit-package-card-client'
 
-const creditPackages = [
+const fallbackCreditPackages = [
   {
     id: 'basic',
     credits: 5000,
@@ -73,8 +74,21 @@ export default async function PurchaseCreditsPage() {
     console.error('Error fetching credit balance:', error)
   }
 
+  // Load dynamic packages from DB; fallback to static if none
+  let dbPackages: Array<{ id: string; name: string; credits: number; price: number; currency: string | null }> = []
+  try {
+    const rows = await prisma.creditPackage.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, credits: true, price: true, currency: true }
+    })
+    dbPackages = rows.map(r => ({ id: r.id, name: r.name, credits: r.credits, price: r.price, currency: r.currency }))
+  } catch (e) {
+    // ignore and use fallback
+  }
+
   return (
     <div className="min-h-screen bg-black text-white">
+      <AnchorHighlighter />
       {/* Header with close button */}
       <div className="flex items-center justify-between p-6 border-b border-gray-800">
         <h1 className="text-2xl font-semibold">Adicionar Créditos</h1>
@@ -95,70 +109,9 @@ export default async function PurchaseCreditsPage() {
 
         {/* Credit Packages */}
         <div className="grid gap-8 md:grid-cols-3 mb-12">
-          {creditPackages.map((pkg) => {
-            const Icon = pkg.icon
-            return (
-              <Card 
-                key={pkg.id}
-                className="relative bg-gray-900 border-gray-700 hover:border-gray-600 transition-all duration-200"
-              >
-                {/* Discount Badge */}
-                {pkg.discount && (
-                  <div className="absolute -top-3 -right-3 z-10">
-                    <Badge className="bg-red-600 text-white px-3 py-1 text-sm">
-                      {pkg.discount}
-                    </Badge>
-                  </div>
-                )}
-
-                <CardHeader className="text-center space-y-4 pb-4">
-                  <div className="w-12 h-12 mx-auto rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-2">
-                      {pkg.credits.toLocaleString('pt-BR')} créditos
-                    </h3>
-                    <div className="space-y-1">
-                      <div className="text-3xl font-bold text-white">
-                        R$ {pkg.price.toFixed(2).replace('.', ',')}
-                      </div>
-                      {pkg.originalPrice && (
-                        <div className="text-sm text-gray-400 line-through">
-                          R$ {pkg.originalPrice.toFixed(2).replace('.', ',')}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-6">
-                  <div className="text-sm text-gray-300">
-                    Com {pkg.credits.toLocaleString('pt-BR')} créditos você pode:
-                  </div>
-
-                  <div className="space-y-3">
-                    {pkg.features.map((feature, index) => (
-                      <div key={index} className="flex items-start gap-3">
-                        <Check className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm text-gray-300">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button 
-                    className="w-full bg-white text-black hover:bg-gray-100 font-medium py-3"
-                    asChild
-                  >
-                    <Link href={`/dashboard/credits/purchase/${pkg.id}`}>
-                      Comprar
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )
-          })}
+          {(dbPackages.length > 0 ? dbPackages : fallbackCreditPackages).map((pkg: any) => (
+            <CreditPackageCardClient key={pkg.id} pkg={pkg} />
+          ))}
         </div>
 
         {/* Payment Methods */}

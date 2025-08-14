@@ -1,166 +1,97 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
+import { handleRoute, DomainError } from '@/lib/http/errors'
+import { z } from 'zod'
+import { validateWith } from '@/lib/validation/zod-helpers'
 
-export async function POST() {
-  try {
-    console.log('🌱 Seeding credit system...')
+// Padronização: somente administradores podem semear créditos.
+// Em produção, exige ALLOW_SEED_CREDITS=true. Em dev/test, liberado.
 
-    // Create credit packages based on InnerAI reference
-    const packages = [
-      {
-        name: '5.000 créditos',
-        credits: 5000,
-        price: 59.00,
-        currency: 'BRL',
-        discountPercent: null
-      },
-      {
-        name: '10.000 créditos',
-        credits: 10000,
-        price: 99.00,
-        currency: 'BRL',
-        discountPercent: 15
-      },
-      {
-        name: '20.000 créditos',
-        credits: 20000,
-        price: 159.00,
-        currency: 'BRL',
-        discountPercent: 30
-      }
-    ]
+const bodySchema = z.object({
+  userId: z.string().min(1, 'userId é obrigatório'),
+  credits: z.number().int().positive('credits deve ser inteiro positivo'),
+  reason: z.string().min(3).max(200).optional(),
+})
 
-    // Upsert credit packages
-    for (const pkg of packages) {
-      await prisma.creditPackage.upsert({
-        where: { name: pkg.name },
-        update: pkg,
-        create: pkg
-      })
+export async function POST(request: Request) {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
-    // Update AI models with credit costs (based on InnerAI usage patterns)
-    const modelUpdates = [
-      {
-        name: 'gpt-4o-mini',
-        creditsPerInputToken: 1,
-        creditsPerOutputToken: 2
-      },
-      {
-        name: 'gpt-4o',
-        creditsPerInputToken: 5,
-        creditsPerOutputToken: 10
-      },
-      {
-        name: 'claude-3-haiku-20240307',
-        creditsPerInputToken: 1,
-        creditsPerOutputToken: 3
-      },
-      {
-        name: 'claude-3-5-sonnet-20241022',
-        creditsPerInputToken: 8,
-        creditsPerOutputToken: 15
+    // Checagem de admin — ajuste conforme seu domínio (ex.: auth.roles?.includes('ADMIN'))
+    {
+      // Tipagem segura evitando any explícito
+      const role = (auth as { role?: 'USER' | 'ADMIN'; isAdmin?: boolean } | undefined)?.role
+      const isAdminFlag = (auth as { role?: 'USER' | 'ADMIN'; isAdmin?: boolean } | undefined)?.isAdmin
+      const isAdmin = role === 'ADMIN' || isAdminFlag === true
+      if (!isAdmin) {
+        throw new DomainError('FORBIDDEN', 'Acesso restrito a administradores')
       }
-    ]
-
-    let modelsUpdated = 0
-    for (const update of modelUpdates) {
-      const result = await prisma.aIModel.updateMany({
-        where: { name: update.name },
-        data: {
-          creditsPerInputToken: update.creditsPerInputToken,
-          creditsPerOutputToken: update.creditsPerOutputToken
-        }
-      })
-      modelsUpdated += result.count
     }
 
-    // Create/update tools with credit costs (based on InnerAI reference)
-    const toolUpdates = [
-      {
-        name: 'Geração de Imagens',
-        type: 'IMAGE_GENERATION',
-        creditsPerUse: 135,
-        costPerUse: 0.10
-      },
-      {
-        name: 'Transcrição de Vídeo',
-        type: 'TRANSCRIPTION',
-        creditsPerUse: 80,
-        costPerUse: 0.05
-      },
-      {
-        name: 'Modo de Voz da IA',
-        type: 'VOICE_GENERATION',
-        creditsPerUse: 50,
-        costPerUse: 0.03
-      },
-      {
-        name: 'Efeitos Sonoros',
-        type: 'SOUND_EFFECTS',
-        creditsPerUse: 30,
-        costPerUse: 0.02
-      }
-    ]
-
-    for (const tool of toolUpdates) {
-      await prisma.tool.upsert({
-        where: { name: tool.name },
-        update: {
-          creditsPerUse: tool.creditsPerUse,
-          costPerUse: tool.costPerUse
-        },
-        create: {
-          name: tool.name,
-          type: tool.type as any,
-          creditsPerUse: tool.creditsPerUse,
-          costPerUse: tool.costPerUse,
-          planRequired: 'FREE'
-        }
-      })
+    // Guard de ambiente
+    const isAllowed =
+      process.env.NODE_ENV !== 'production' || process.env.ALLOW_SEED_CREDITS === 'true'
+    if (!isAllowed) {
+      throw new DomainError(
+        'FORBIDDEN',
+        'Endpoint de seed permitido apenas fora de produção (defina ALLOW_SEED_CREDITS=true para habilitar em produção)'
+      )
     }
 
-    // Give initial credits to existing users (migration bonus)
-    const users = await prisma.user.findMany({
-      where: { creditBalance: 0 },
-      select: { id: true }
+    // Rate limit em memória por IP + adminId
+    const { extractClientIp, applyRateLimit } = await import('@/lib/auth/guards')
+    const ip = extractClientIp(request.headers)
+    const rl = await applyRateLimit([ip, auth.userId, 'admin_seed_credits'], { windowMs: 60_000, max: 3 })
+    if (rl) {
+      setNoStore(rl)
+      return rl
+    }
+
+    // Parse body
+    let json: unknown = null
+    try {
+      json = await request.json()
+    } catch {
+      // segue para validação
+    }
+
+    const parsed = await validateWith(bodySchema, json)
+    if (parsed instanceof Response) {
+      return parsed
+    }
+    const { userId, credits, reason } = parsed
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, creditBalance: true },
+    })
+    if (!user) {
+      throw new DomainError('NOT_FOUND', 'Usuário não encontrado')
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { creditBalance: (user.creditBalance ?? 0) + credits },
+      select: { id: true, creditBalance: true },
     })
 
-    for (const user of users) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { creditBalance: 500 } // Initial bonus credits
-      })
-
-      await prisma.creditTransaction.create({
-        data: {
-          userId: user.id,
-          type: 'BONUS',
-          amount: 500,
-          description: 'Bônus de migração - créditos iniciais',
-          balanceBefore: 0,
-          balanceAfter: 500
-        }
-      })
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Credit system seeded successfully!',
-      data: {
-        packagesCreated: packages.length,
-        modelsUpdated,
-        toolsCreated: toolUpdates.length,
-        usersWithInitialCredits: users.length
-      }
-    })
-
-  } catch (error) {
-    console.error('❌ Error seeding credits:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to seed credit system',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
-  }
+    const res = NextResponse.json(
+      {
+        success: true,
+        userId: updated.id,
+        newBalance: typeof updated.creditBalance === 'number' ? updated.creditBalance : 0,
+        reason: reason ?? null,
+      },
+      { status: 201 }
+    )
+    setNoStore(res)
+    return res
+  })
 }

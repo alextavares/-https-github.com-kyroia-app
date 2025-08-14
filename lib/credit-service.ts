@@ -121,9 +121,7 @@ export class CreditService {
         data: {
           userId,
           type: 'CONSUMPTION',
-          amount: -amount, // negative for consumption
-          description,
-          relatedId: referenceId
+          amount: -amount // negative for consumption
         }
       })
 
@@ -167,9 +165,7 @@ export class CreditService {
         data: {
           userId,
           type,
-          amount, // positive for additions
-          description,
-          relatedId: packageId
+          amount // positive for additions
         }
       })
 

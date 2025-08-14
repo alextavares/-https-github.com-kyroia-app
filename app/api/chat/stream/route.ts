@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma"
 import { aiService } from "@/lib/ai/ai-service"
 import { AIMessage } from "@/lib/ai/types"
 import { checkUsageLimits, trackUsage } from "@/lib/usage-limits"
+import { CreditService } from "@/lib/credit-service"
+import { calculateCreditsForTokens, modelRequiresCredits } from "@/lib/ai/innerai-models-config"
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder()
@@ -54,6 +56,21 @@ export async function POST(request: NextRequest) {
         JSON.stringify({ message: "Usuário não encontrado" }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Se o modelo exigir créditos, checar saldo básico antes de iniciar
+    if (modelRequiresCredits(model)) {
+      const balance = await CreditService.getUserBalance(user.id)
+      if (balance <= 0) {
+        return new Response(
+          JSON.stringify({
+            errorCode: "INSUFFICIENT_CREDITS",
+            message: "Créditos insuficientes para usar este modelo",
+            currentBalance: balance,
+          }),
+          { status: 402, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     // Criar stream
@@ -127,12 +144,43 @@ export async function POST(request: NextRequest) {
               // Atualizar estatísticas
               await trackUsage(user.id, model, tokensUsed, cost)
 
-              // Enviar dados finais
+              // Debitar créditos quando aplicável (pós-processamento, baseado em tokens reais)
+              let creditsCharged: number | null = null
+              if (modelRequiresCredits(model)) {
+                try {
+                  const credits = calculateCreditsForTokens(
+                    model,
+                    tokensUsed.input,
+                    tokensUsed.output
+                  )
+                  const charge = await CreditService.consumeCredits(
+                    user.id,
+                    credits,
+                    `Chat with model ${model}`,
+                    conversation.id,
+                    'CHAT'
+                  )
+                  if (!charge.success) {
+                    console.error('[chat] credit_charge_failed', charge.message)
+                  } else {
+                    creditsCharged = charge.creditsConsumed ?? credits
+                  }
+                } catch (e) {
+                  console.error('[chat] credit_charge_exception', e)
+                }
+              }
+
+              // Enviar dados finais (respeitando preferência do cliente via header opcional)
+              let includeCost = false
+              try {
+                includeCost = request.headers.get('x-show-cost') === 'true'
+              } catch {}
               const finalData = JSON.stringify({
                 done: true,
                 conversationId: conversation.id,
                 tokensUsed,
-                cost
+                cost: includeCost ? cost : undefined,
+                creditsCharged: includeCost ? creditsCharged : undefined,
               })
               controller.enqueue(encoder.encode(`data: ${finalData}\n\n`))
               controller.close()

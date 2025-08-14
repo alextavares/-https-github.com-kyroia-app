@@ -51,8 +51,10 @@ class LRUCache<K, V> {
       this.cache.delete(key)
     } else if (this.cache.size >= this.maxSize) {
       // Remove least recently used item
-      const firstKey = this.cache.keys().next().value
-      this.cache.delete(firstKey)
+      const firstKey = this.cache.keys().next().value as K | undefined
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey)
+      }
     }
     this.cache.set(key, value)
   }
@@ -551,4 +553,4 @@ performanceMonitor.createRateLimiter('chat-messages', {
   skipFailedRequests: true
 })
 
-export type { PerformanceMetrics, CacheConfig, RateLimitConfig }
+/* removed duplicate re-exports to avoid conflicts */

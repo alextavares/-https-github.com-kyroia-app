@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ConversationHistory from '@/components/chat/conversation-history'
 import {
   Select,
@@ -163,7 +164,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState('mistral-7b')
+  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini')
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [userPlan, setUserPlan] = useState<string>('FREE')
@@ -212,6 +213,12 @@ export default function ChatPage() {
   useEffect(() => {
     setIsChatDisabledByLimit(false)
   }, [selectedModel])
+
+  // Nome amigável do modelo atual (para badge no header)
+  const currentModelName = (() => {
+    const match = getAvailableModels(userPlan).find(m => m.id === selectedModel)
+    return match?.name ?? selectedModel
+  })()
 
   const loadTemplate = useCallback(async (templateId: string) => {
     try {
@@ -639,7 +646,7 @@ class HttpError extends Error {
       
       {/* Área principal do chat */}
       <div className="flex-1 flex flex-col">
-        {/* Header - InnerAI Style */}
+        {/* Header - Kyroia Style */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-border/50">
         <div className="flex items-center gap-4">
           <Select value={selectedModel} onValueChange={setSelectedModel}>
@@ -679,6 +686,9 @@ class HttpError extends Error {
           >
             <RotateCcw className="h-5 w-5" />
           </Button>
+          <Badge variant="outline" className="ml-1 hidden md:inline-flex border-border/50" title={selectedModel}>
+            {currentModelName}
+          </Badge>
         </div>
       </div>
 
@@ -927,7 +937,7 @@ class HttpError extends Error {
         )}
       </ScrollArea>
 
-      {/* Input Area - InnerAI Style */}
+      {/* Input Area - Kyroia Style */}
       <div className="p-4 border-t border-border/50 chat-input-shadow">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
           {/* Attachments Preview */}
@@ -1022,12 +1032,14 @@ class HttpError extends Error {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                 <Button
                   type="button"
                   variant={webSearchEnabled ? "secondary" : "ghost"}
                   size="sm"
                   className="h-8 px-3 rounded-lg text-xs hover:bg-accent flex items-center gap-2"
-                  title="Web Search"
                   onClick={() => {
                     setWebSearchEnabled(!webSearchEnabled)
                     toast({
@@ -1041,13 +1053,21 @@ class HttpError extends Error {
                   <Globe className="h-4 w-4" />
                   <span>Web Search</span>
                 </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Ativa buscas na web como contexto
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                 <Button
                   type="button"
                   variant={knowledgeBaseEnabled ? "secondary" : "ghost"}
                   size="sm"
                   className="h-8 px-3 rounded-lg text-xs hover:bg-accent flex items-center gap-2"
-                  title="Knowledge Base"
                   onClick={() => {
                     setKnowledgeBaseEnabled(!knowledgeBaseEnabled)
                     toast({
@@ -1061,6 +1081,12 @@ class HttpError extends Error {
                   <BookOpen className="h-4 w-4" />
                   <span>Knowledge</span>
                 </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Usa documentos da sua base como contexto
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               
               <Button

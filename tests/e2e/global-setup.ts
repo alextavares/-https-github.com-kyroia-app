@@ -12,8 +12,9 @@ async function globalSetup(config: FullConfig) {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3025'
   // Navigate to login and create authenticated state
-  await page.goto('http://localhost:3000/auth/signin');
+  await page.goto(`${baseUrl}/auth/signin`);
   
   // If using real auth, login here and save state
   // For mocks, we'll handle it in individual tests

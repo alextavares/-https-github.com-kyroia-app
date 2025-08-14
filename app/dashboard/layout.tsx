@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { DashboardSidebar } from '@/components/dashboard/sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
+import UsageIndicator from '@/components/usage/usage-indicator'
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,11 @@ export default async function DashboardLayout({
         <div className="flex-1 flex flex-col overflow-hidden">
           <main className="flex-1 overflow-y-auto bg-black hide-scrollbar">
             <div className="w-full max-w-none px-4 lg:px-6">
+              {/* Indicador mínimo de uso – só aparece perto do limite */}
+              <div className="pt-3 pb-2">
+                {/* @ts-expect-error Server/Client boundary – componente client-safe */}
+                <UsageIndicator variant="minimal" />
+              </div>
               {children}
             </div>
           </main>

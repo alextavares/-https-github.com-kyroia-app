@@ -1,40 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { signOut } from 'next-auth/react'
+import { requireAuth, applyRateLimit, extractClientIp } from '@/lib/auth/guards'
+import { handleRoute, Unauthorized, NotFound } from '@/lib/http/errors'
+import { setNoStore } from '@/lib/cache/headers'
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      )
+/**
+ * DELETE /api/user/delete
+ * Padrão: handleRoute + requireAuth + respostas consistentes + no-store
+ * Observações:
+ * - Verifica existência do usuário antes de excluir.
+ * - Retorna 204 No Content para operações idempotentes e sem payload.
+ */
+export async function DELETE(request: Request) {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      return Unauthorized(auth.error?.message ?? 'Não autorizado')
     }
 
-    // Delete user and all related data (cascade delete)
+    // Rate limit por IP + userId para operação sensível
+    const ip = extractClientIp(request.headers)
+    const rl = await applyRateLimit([ip, auth.userId, 'user_delete'], { windowMs: 60_000, max: 2 })
+    if (rl) {
+      setNoStore(rl)
+      return rl
+    }
+
+    // Verifica se o usuário existe (evita erro genérico do Prisma)
+    const exists = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { id: true },
+    })
+    if (!exists) {
+      return NotFound('Usuário não encontrado')
+    }
+
     await prisma.user.delete({
-      where: { id: session.user.id },
+      where: { id: auth.userId },
     })
 
-    // The cascade delete in Prisma schema will automatically delete:
-    // - conversations (and their messages)
-    // - userUsage
-    // - subscriptions
-    // - payments
-    // - promptTemplates created by user
-    // - messageFeedback
-    // - toolUsage
-
-    return NextResponse.json({ message: 'Conta excluída com sucesso' })
-  } catch (error) {
-    console.error('Delete account error:', error)
-    return NextResponse.json(
-      { error: 'Erro ao excluir conta' },
-      { status: 500 }
-    )
-  }
+    // Sem corpo de resposta; apenas confirma operação
+    const res = new NextResponse(null, { status: 204 })
+    setNoStore(res)
+    return res
+  })
 }

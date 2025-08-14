@@ -1,21 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth/guards'
+import { handleRoute, DomainError } from '@/lib/http/errors'
+import { setNoStore } from '@/lib/cache/headers'
+import { z } from 'zod'
+import { validateWith } from '@/lib/validation/zod-helpers'
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      )
+export async function GET() {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: auth.userId },
       select: {
         id: true,
         email: true,
@@ -27,46 +28,37 @@ export async function GET(request: NextRequest) {
     })
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Usuário não encontrado' },
-        { status: 404 }
-      )
+      throw new DomainError('NOT_FOUND', 'Usuário não encontrado')
     }
 
-    return NextResponse.json(user)
-  } catch (error) {
-    console.error('Get profile error:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
-  }
+    const res = NextResponse.json(user)
+    setNoStore(res)
+    return res
+  })
 }
 
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      )
+const patchSchema = z.object({
+  name: z.string().min(2).max(120),
+})
+
+export async function PATCH(request: Request) {
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
+      setNoStore(res)
+      return res
     }
 
-    const body = await request.json()
-    const { name } = body
-
-    if (!name || name.length < 2) {
-      return NextResponse.json(
-        { error: 'Nome inválido' },
-        { status: 400 }
-      )
+    const json = await request.json()
+    const input = await validateWith(patchSchema, json)
+    if (input instanceof Response) {
+      return input
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: session.user.id },
-      data: { name },
+      where: { id: auth.userId },
+      data: { name: input.name },
       select: {
         id: true,
         email: true,
@@ -77,12 +69,8 @@ export async function PATCH(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(updatedUser)
-  } catch (error) {
-    console.error('Update profile error:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
-  }
+    const res = NextResponse.json(updatedUser)
+    setNoStore(res)
+    return res
+  })
 }

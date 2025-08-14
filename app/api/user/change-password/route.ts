@@ -1,78 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth } from '@/lib/auth/guards'
+import { setNoStore } from '@/lib/cache/headers'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { z } from 'zod'
+import { handleRoute, Unauthorized, BadRequest, NotFound } from '@/lib/http/errors'
+import { validateWith } from '@/lib/validation/zod-helpers'
 
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Senha atual é obrigatória'),
+  newPassword: z
+    .string()
+    .min(8, 'Nova senha deve ter pelo menos 8 caracteres')
+    .max(128, 'Nova senha deve ter no máximo 128 caracteres')
+    .refine((val) => /[A-Za-z]/.test(val) && /[0-9]/.test(val), {
+      message: 'Nova senha deve conter letras e números',
+    }),
+})
+
+/**
+ * POST /api/user/change-password
+ * Padrão: handleRoute + Unauthorized/BadRequest/NotFound + no-store
+ */
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      )
+  return handleRoute(async () => {
+    const auth = await requireAuth()
+    if (!auth.ok) {
+      return Unauthorized('Não autorizado')
     }
 
-    const body = await request.json()
-    const { currentPassword, newPassword } = body
+    // validação com helper padronizado
+    const json = await request.json().catch(() => null)
+    const parsed = await validateWith(ChangePasswordSchema, json)
+    if (parsed instanceof Response) return parsed
 
-    if (!currentPassword || !newPassword) {
-      return NextResponse.json(
-        { error: 'Senhas são obrigatórias' },
-        { status: 400 }
-      )
-    }
+    const { currentPassword, newPassword } = parsed
 
-    if (newPassword.length < 6) {
-      return NextResponse.json(
-        { error: 'Nova senha deve ter pelo menos 6 caracteres' },
-        { status: 400 }
-      )
-    }
-
-    // Get user with password
+    // Buscar usuário com hash de senha (campo correto: password)
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        passwordHash: true,
-      },
+      where: { id: auth.userId },
+      select: { id: true, password: true },
     })
 
-    if (!user || !user.passwordHash) {
-      return NextResponse.json(
-        { error: 'Usuário não encontrado' },
-        { status: 404 }
-      )
+    if (!user || !user.password) {
+      return NotFound('Usuário não encontrado')
     }
 
-    // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash)
-    
+    // Verificar senha atual
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password)
     if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: 'Senha atual incorreta' },
-        { status: 400 }
-      )
+      return BadRequest('Senha atual incorreta')
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
+    // Evitar reutilização de mesma senha
+    const isSame = await bcrypt.compare(newPassword, user.password)
+    if (isSame) {
+      return BadRequest('Nova senha não pode ser igual à atual')
+    }
 
-    // Update password
+    // Gerar novo hash e atualizar (campo correto: password)
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
     await prisma.user.update({
-      where: { id: session.user.id },
-      data: { passwordHash: hashedPassword },
+      where: { id: auth.userId },
+      data: { password: hashedPassword },
     })
 
-    return NextResponse.json({ message: 'Senha alterada com sucesso' })
-  } catch (error) {
-    console.error('Change password error:', error)
-    return NextResponse.json(
-      { error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
-  }
+    const res = NextResponse.json({ message: 'Senha alterada com sucesso' })
+    setNoStore(res)
+    return res
+  })
 }

@@ -33,7 +33,7 @@ async function main() {
         onboardingCompleted: true,
         usageType: 'USO_PESSOAL',
         professionCategory: 'Desenvolvedor',
-        organization: 'InnerAI Test',
+        organization: 'Kyroia Test',
         phone: '+5511999999999',
       }
     })

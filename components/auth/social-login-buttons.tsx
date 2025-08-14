@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { useEffect, useMemo, useState } from "react"
+import { getProviders, signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Icons } from "@/components/icons"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,13 @@ export function SocialLoginButtons({
   callbackUrl = "/dashboard" 
 }: SocialLoginButtonsProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null)
+  const [availableProviders, setAvailableProviders] = useState<Record<string, any> | null>(null)
+
+  useEffect(() => {
+    getProviders()
+      .then((prov) => setAvailableProviders(prov ?? {}))
+      .catch(() => setAvailableProviders({}))
+  }, [])
 
   const handleSocialLogin = async (provider: string) => {
     setIsLoading(provider)
@@ -36,28 +43,21 @@ export function SocialLoginButtons({
       className: "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
     },
     {
-      id: "azure-ad",
-      name: "Microsoft", 
-      icon: Icons.microsoft,
-      className: "bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
-    },
-    {
       id: "apple",
       name: "Apple",
       icon: Icons.apple,
       className: "bg-black hover:bg-gray-900 text-white"
-    },
-    {
-      id: "github",
-      name: "GitHub",
-      icon: Icons.gitHub,
-      className: "bg-gray-900 hover:bg-gray-800 text-white"
     }
   ]
 
+  const providersToRender = useMemo(() => {
+    if (!availableProviders) return [] as typeof socialProviders
+    return socialProviders.filter(p => !!availableProviders[p.id])
+  }, [availableProviders])
+
   return (
-    <div className={cn("grid gap-2", className)}>
-      {socialProviders.map((provider) => {
+    <div className={cn("grid grid-cols-2 gap-3", className)}>
+      {providersToRender.map((provider) => {
         const Icon = provider.icon
         return (
           <Button
@@ -79,6 +79,11 @@ export function SocialLoginButtons({
           </Button>
         )
       })}
+      {availableProviders && providersToRender.length === 0 && (
+        <div className="col-span-2 text-center text-sm text-muted-foreground">
+          Login social não configurado. Use login por email.
+        </div>
+      )}
     </div>
   )
 }
