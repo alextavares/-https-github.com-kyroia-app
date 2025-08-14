@@ -14,7 +14,7 @@ export function isValidMercadoPagoRequest(req: NextRequest, body: string): boole
 
   // Parse header: example "ts=1612345678,v1=<hex>"
   const sigMap = Object.fromEntries(
-    signature.split(',').map((p) => {
+    signature.split(',').map((p: string) => {
       const [k, v] = p.split('=');
       return [k?.trim(), v?.trim()];
     })

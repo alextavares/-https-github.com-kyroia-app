@@ -59,12 +59,9 @@ export async function middleware(request: NextRequest) {
                           request.nextUrl.pathname.startsWith('/api/payments/status') ||
                           request.nextUrl.pathname.startsWith('/api/stripe/webhook') ||
                           request.nextUrl.pathname === '/api/test-webhook' ||
-                          request.nextUrl.pathname.startsWith('/api/test/simulate-payment') ||
-<<<<<<< HEAD
-                          request.nextUrl.pathname.startsWith('/api/debug/') ||
-                          request.nextUrl.pathname === '/api/debug-env' ||
-=======
->>>>>>> kyroia
+                           request.nextUrl.pathname.startsWith('/api/test/simulate-payment') ||
+                           request.nextUrl.pathname.startsWith('/api/debug/') ||
+                           request.nextUrl.pathname === '/api/debug-env' ||
                           request.nextUrl.pathname.startsWith('/api/test-auth') ||
                           request.nextUrl.pathname.startsWith('/api/health-check') ||
                           request.nextUrl.pathname === '/api/chat-anonymous' ||
