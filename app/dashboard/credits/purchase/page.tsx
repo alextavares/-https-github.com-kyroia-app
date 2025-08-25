@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Coins, Star, Crown, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import Link from 'next/link'
 import { CreditService } from '@/lib/credit-service'
 import { prisma } from '@/lib/prisma'
@@ -16,7 +16,7 @@ const fallbackCreditPackages = [
     price: 59.00,
     originalPrice: null,
     discount: null,
-    icon: Coins,
+    iconKey: 'coins',
     color: 'from-amber-500 to-amber-600',
     borderColor: 'border-amber-500/30',
     features: [
@@ -32,7 +32,7 @@ const fallbackCreditPackages = [
     price: 99.00,
     originalPrice: 116.47,
     discount: '15% off',
-    icon: Star,
+    iconKey: 'star',
     color: 'from-amber-500 to-amber-600',
     borderColor: 'border-amber-500/30',
     popular: true,
@@ -49,7 +49,7 @@ const fallbackCreditPackages = [
     price: 159.00,
     originalPrice: 227.06,
     discount: '30% off',
-    icon: Crown,
+    iconKey: 'crown',
     color: 'from-amber-500 to-amber-600',
     borderColor: 'border-amber-500/30',
     features: [
@@ -87,56 +87,56 @@ export default async function PurchaseCreditsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <AnchorHighlighter />
       {/* Header with close button */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-800">
-        <h1 className="text-2xl font-semibold">Adicionar Créditos</h1>
+      <div className="flex items-center justify-between p-4 border-b border-border/60">
+        <h1 className="text-xl font-semibold">Adicionar Créditos</h1>
         <Link href="/dashboard">
-          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-            <X className="h-6 w-6" />
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
           </Button>
         </Link>
       </div>
 
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
         {/* Description */}
-        <div className="text-center mb-12">
-          <p className="text-gray-400 text-lg max-w-3xl mx-auto">
+        <div className="text-center mb-8">
+          <p className="text-muted-foreground text-sm max-w-3xl mx-auto">
             Créditos adicionais nunca expiram e podem ser usados enquanto você tem uma assinatura ativa.
           </p>
         </div>
 
         {/* Credit Packages */}
-        <div className="grid gap-8 md:grid-cols-3 mb-12">
+        <div className="grid gap-3 md:grid-cols-3 mb-10">
           {(dbPackages.length > 0 ? dbPackages : fallbackCreditPackages).map((pkg: any) => (
             <CreditPackageCardClient key={pkg.id} pkg={pkg} />
           ))}
         </div>
 
         {/* Payment Methods */}
-        <div className="text-center space-y-6">
-          <div className="flex justify-center items-center gap-6">
-            <div className="flex items-center gap-2 bg-teal-600 rounded-lg px-4 py-2">
-              <div className="w-6 h-6 bg-white rounded flex items-center justify-center">
-                <span className="text-xs font-bold text-teal-600">PIX</span>
+        <div className="text-center space-y-4">
+          <div className="flex justify-center items-center gap-3">
+            <div className="flex items-center gap-2 bg-accent/20 border border-border/60 rounded-md px-3 py-1.5">
+              <div className="w-5 h-5 bg-white rounded flex items-center justify-center">
+                <span className="text-[10px] font-bold text-accent">PIX</span>
               </div>
-              <span className="text-white font-medium">PIX</span>
+              <span className="text-foreground text-sm">PIX</span>
             </div>
-            <div className="flex items-center gap-2 bg-gray-800 rounded-lg px-4 py-2">
-              <div className="w-6 h-6 bg-red-600 rounded flex items-center justify-center">
-                <span className="text-xs font-bold text-white">M</span>
+            <div className="flex items-center gap-2 bg-background/60 border border-border/60 rounded-md px-3 py-1.5">
+              <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center">
+                <span className="text-[10px] font-bold text-white">M</span>
               </div>
-              <span className="text-gray-300">Mastercard</span>
+              <span className="text-muted-foreground text-sm">Mastercard</span>
             </div>
-            <div className="flex items-center gap-2 bg-gray-800 rounded-lg px-4 py-2">
-              <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
-                <span className="text-xs font-bold text-white">V</span>
+            <div className="flex items-center gap-2 bg-background/60 border border-border/60 rounded-md px-3 py-1.5">
+              <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
+                <span className="text-[10px] font-bold text-white">V</span>
               </div>
-              <span className="text-gray-300">Visa</span>
+              <span className="text-muted-foreground text-sm">Visa</span>
             </div>
-            <div className="bg-gray-800 rounded-lg px-4 py-2">
-              <span className="text-gray-300">e outros</span>
+            <div className="bg-background/60 border border-border/60 rounded-md px-3 py-1.5">
+              <span className="text-muted-foreground text-sm">e outros</span>
             </div>
           </div>
         </div>

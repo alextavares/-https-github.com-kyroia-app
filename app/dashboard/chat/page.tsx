@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ConversationHistory from '@/components/chat/conversation-history'
 import {
@@ -30,8 +29,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import {
   Send,
   Bot,
@@ -39,11 +39,8 @@ import {
   Loader2,
   Copy,
   Check,
-  RotateCcw,
-  Download,
-  Sparkles,
-  Code,
-  Brain,
+  Edit3,
+  RefreshCcw,
   Zap,
   Paperclip,
   X,
@@ -51,11 +48,15 @@ import {
   Image,
   Monitor,
   Save,
-  Link,
+  Link as LinkIcon,
   Globe,
-  Search,
   BookOpen,
   Plus,
+  Sun,
+  Moon,
+  Menu,
+  Sparkles,
+  Code,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
@@ -75,6 +76,38 @@ interface FileAttachment {
   type: string
   size: number
   content: string // base64 for images, text content for documents
+}
+
+function RenderMessageContent({ content, isDark }: { content: string; isDark?: boolean }) {
+  const lines = content.split('\n')
+  const parts: JSX.Element[] = []
+  let quoteBuffer: string[] = []
+
+  const flushQuote = () => {
+    if (quoteBuffer.length) {
+      parts.push(
+        <div key={`q-${parts.length}`} className={`border-l-4 pl-4 py-2 my-2 rounded-r-lg ${isDark ? 'bg-blue-500/10 border-blue-400/30' : 'bg-blue-50 border-blue-200'}`}>
+          <div className="text-sm text-foreground/90 whitespace-pre-wrap italic">{quoteBuffer.join('\n').replace(/^>\s?/gm, '')}</div>
+        </div>
+      )
+      quoteBuffer = []
+    }
+  }
+
+  lines.forEach((line, idx) => {
+    if (line.trim().startsWith('>')) {
+      quoteBuffer.push(line)
+    } else {
+      flushQuote()
+      parts.push(
+        <div key={`p-${idx}`} className="text-sm leading-relaxed whitespace-pre-wrap">
+          {line.length ? line : ' '}
+        </div>
+      )
+    }
+  })
+  flushQuote()
+  return <>{parts}</>
 }
 
 // Categorias de modelos para melhor organização seguindo a estrutura da imagem
@@ -165,6 +198,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState('gpt-4o-mini')
+  const [selectedCategory, setSelectedCategory] = useState<'FAST' | 'ADVANCED' | 'CODE'>('FAST')
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [userPlan, setUserPlan] = useState<string>('FREE')
@@ -179,6 +213,154 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const hasLoadedRef = useRef(false) // Prevent multiple loads
+  const [usage, setUsage] = useState<{ used: number; limit: number | null; planType?: string }>({ used: 0, limit: null })
+  const isAtLimit = typeof usage.limit === 'number' && usage.used >= usage.limit
+  const [chatTheme, setChatTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'light'
+    try { return (localStorage.getItem('chatTheme') as 'dark' | 'light') || 'light' } catch { return 'light' }
+  })
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState<string>('')
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [recentConversations, setRecentConversations] = useState<Array<{id:string; title:string}>>([])
+  const [conversationTitle, setConversationTitle] = useState<string>('Nova conversa')
+  const [editingTitle, setEditingTitle] = useState<boolean>(false)
+  const [titleInput, setTitleInput] = useState<string>('')
+  const [modelStatus, setModelStatus] = useState<'idle'|'thinking'|'error'>('idle')
+  const [inputFocused, setInputFocused] = useState(false)
+
+  useEffect(() => {
+    // carregar recentes (melhora painel direito)
+    ;(async()=>{
+      try {
+        const c = await fetch('/api/conversations').then(r=>r.ok?r.json():[])
+        setRecentConversations(Array.isArray(c) ? c.slice(0,5).map((x:any)=>({ id:x.id, title:x.title })) : [])
+      } catch { setRecentConversations([]) }
+    })()
+  }, [])
+
+  // Título dinâmico: pega o primeiro prompt do usuário como fallback
+  useEffect(() => {
+    const userFirst = messages.find(m => m.role === 'user')
+    if (userFirst && userFirst.content) {
+      const t = userFirst.content.trim().slice(0, 60)
+      if (t) setConversationTitle(t)
+    } else {
+      setConversationTitle('Nova conversa')
+    }
+  }, [messages])
+
+  // Carrega título salvo localmente quando não há conversationId
+  useEffect(() => {
+    if (!conversationId) {
+      try {
+        const t = localStorage.getItem('kyroia:conv-title-draft')
+        if (t && t.trim()) setConversationTitle(t.trim())
+      } catch {}
+    }
+  }, [conversationId])
+
+  const modelLabel = useMemo(() => {
+    const map: Record<string,string> = {
+      'gpt-4o-mini': 'GPT‑4o Mini',
+    }
+    return map[selectedModel] || selectedModel
+  }, [selectedModel])
+  const statusColor = useMemo(() => {
+    return modelStatus === 'thinking' ? 'bg-amber-500' : modelStatus === 'error' ? 'bg-red-500' : 'bg-emerald-500'
+  }, [modelStatus])
+  
+  const handleRegenerateFromLastUser = () => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        const text = messages[i].content
+        setInput(text)
+        setTimeout(() => {
+          try { handleSubmit({ preventDefault: () => {} } as any) } catch {}
+        }, 0)
+        break
+      }
+    }
+  }
+
+  const handleSetConversationTitle = async (proposed: string) => {
+    const title = (proposed || '').trim().slice(0, 80)
+    if (!title) return
+    if (!conversationId) {
+      toast({ title: 'Título atualizado', description: title })
+      return
+    }
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+      if (!res.ok) throw new Error('Falha ao atualizar título')
+      toast({ title: 'Título atualizado', description: title })
+    } catch (e) {
+      toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Não foi possível atualizar o título', variant: 'destructive' })
+    }
+  }
+
+  const resendFrom = async (index: number) => {
+    if (index < 0 || index >= messages.length) return
+    if (messages[index].role !== 'user') return
+    const base = messages.slice(0, index + 1)
+    setMessages(base)
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: base.map(msg => ({ role: msg.role, content: msg.content, attachments: msg.attachments })),
+          model: selectedModel,
+          conversationId,
+          webSearchEnabled,
+          knowledgeBaseEnabled,
+        })
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData?.message || 'Erro na resposta')
+      }
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Stream não disponível')
+      let assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: '', timestamp: new Date(), model: selectedModel }
+      setMessages(prev => [...prev, assistantMessage])
+      const decoder = new TextDecoder()
+      let done = false
+      while (!done) {
+        const { value, done: doneReading } = await reader.read()
+        done = doneReading
+        if (value) {
+          const chunk = decoder.decode(value)
+          const lines = chunk.split('\n')
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                if (data.token) {
+                  assistantMessage.content += data.token
+                  setMessages(prev => prev.map(msg => msg.id === assistantMessage.id ? { ...msg, content: assistantMessage.content } : msg))
+                }
+                if (data.done) {
+                  setConversationId(data.conversationId)
+                  assistantMessage.tokensUsed = data.tokensUsed?.total
+                }
+                if (data.error) throw new Error(data.error)
+              } catch {}
+            }
+          }
+        }
+      }
+    } catch (error) {
+      toast({ title: 'Erro', description: error instanceof Error ? error.message : 'Falha ao reenviar', variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -207,6 +389,30 @@ export default function ChatPage() {
     if (session) {
       fetchUserPlan()
     }
+  }, [session])
+  
+  useEffect(() => {
+    try {
+      localStorage.setItem('chatTheme', chatTheme)
+      window.dispatchEvent(new CustomEvent('kyroia:theme', { detail: { theme: chatTheme } }))
+    } catch {}
+  }, [chatTheme])
+
+  // Load simple daily usage for header banner
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/usage/today', { cache: 'no-store' })
+        if (!res.ok) return
+        const j = await res.json()
+        setUsage({
+          used: Number(j?.dailyMessages?.used ?? 0),
+          limit: j?.dailyMessages?.limit ?? null,
+          planType: j?.planType,
+        })
+      } catch {}
+    }
+    load()
   }, [session])
 
   // Reset chat disabled state when model changes
@@ -294,6 +500,18 @@ export default function ChatPage() {
       }, 100)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Client-only effect to prefill from localStorage without affecting SSR markup
+  useEffect(() => {
+    try {
+      const draft = localStorage.getItem('kyroia:template-draft')
+      if (draft) {
+        const ev = new CustomEvent('kyroia:prefill', { detail: { text: draft } })
+        window.dispatchEvent(ev)
+        localStorage.removeItem('kyroia:template-draft')
+      }
+    } catch {}
   }, [])
 
 // Classe de erro customizada
@@ -470,6 +688,7 @@ class HttpError extends Error {
     setInput('')
     setAttachments([]) // Clear attachments after sending
     setIsLoading(true)
+    setModelStatus('thinking')
 
     try {
       const response = await fetch('/api/chat/stream', {
@@ -553,6 +772,7 @@ class HttpError extends Error {
       }
     } catch (error) {
       console.error('Chat error:', error)
+      setModelStatus('error')
       let toastMessage = "Erro ao enviar mensagem";
       let toastTitle = "Erro no chat";
 
@@ -606,7 +826,28 @@ class HttpError extends Error {
 
     } finally {
       setIsLoading(false)
+      if (!isChatDisabledByLimit && modelStatus !== 'error') setModelStatus('idle')
     }
+  }
+
+  // Inline title editing helpers
+  const startInlineTitleEdit = () => {
+    setTitleInput(conversationTitle)
+    setEditingTitle(true)
+  }
+  const commitInlineTitleEdit = () => {
+    const v = titleInput.trim()
+    if (v && v !== conversationTitle) {
+      if (conversationId) {
+        handleSetConversationTitle(v)
+        try { localStorage.removeItem('kyroia:conv-title-draft') } catch {}
+      } else {
+        setConversationTitle(v)
+        try { localStorage.setItem('kyroia:conv-title-draft', v) } catch {}
+        toast({ title: 'Título salvo localmente', description: v })
+      }
+    }
+    setEditingTitle(false)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -634,280 +875,300 @@ class HttpError extends Error {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)]">
-      {/* Sidebar com histórico de conversas */}
-      <div className="w-[320px] border-r border-border/50">
-        <ConversationHistory 
-          currentConversationId={conversationId || undefined}
-          onSelectConversation={handleLoadConversation}
-          onNewConversation={handleNewConversation}
-        />
-      </div>
-      
-      {/* Área principal do chat */}
-      <div className="flex-1 flex flex-col">
-        {/* Header - Kyroia Style */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-border/50">
-        <div className="flex items-center gap-4">
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger className="w-[200px] h-10 bg-card border-border/50 rounded-xl">
-              <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4 text-primary" />
-                <SelectValue />
+    <div className="min-h-screen w-full">
+      {/* Conteúdo principal simplificado */}
+      <main className="max-w-4xl mx-auto px-4 flex flex-col min-w-0">
+        {/* Topbar removido para simplificar */}
+        <div className="hidden">
+          {/* Botão hambúrguer + Drawer (apenas mobile) */}
+          <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-black/10"
+                aria-label="Abrir histórico de conversas"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-72 sm:w-80">
+              <ConversationHistory
+                currentConversationId={conversationId || undefined}
+                onSelectConversation={(id) => {
+                  handleLoadConversation(id)
+                  setIsMobileSidebarOpen(false)
+                }}
+                onNewConversation={() => {
+                  handleNewConversation()
+                  setIsMobileSidebarOpen(false)
+                }}
+              />
+            </SheetContent>
+          </Sheet>
+
+          {/* Seletor segmentado por categoria + select de modelos */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Headline da conversa */}
+            <div className="hidden md:flex flex-col mr-2 min-w-0">
+              <div className="text-sm font-medium truncate">
+                {editingTitle ? (
+                  <input
+                    value={titleInput}
+                    onChange={(e)=>setTitleInput(e.target.value)}
+                    onBlur={commitInlineTitleEdit}
+                    onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); commitInlineTitleEdit()} if(e.key==='Escape'){ setEditingTitle(false) } }}
+                    autoFocus
+                    className="h-7 px-2 rounded border border-border bg-background text-foreground text-sm w-full"
+                  />
+                ) : (
+                  <button type="button" className="truncate text-left hover:underline" onClick={startInlineTitleEdit} title="Renomear conversa">
+                    {conversationTitle}
+                  </button>
+                )}
               </div>
-            </SelectTrigger>
-            <SelectContent className="max-h-[400px] bg-card border-border/50 rounded-xl">
-              {getAvailableModels(userPlan).map(model => {
-                const Icon = model.icon
-                return (
-                  <SelectItem key={model.id} value={model.id} className="rounded-lg">
-                    <div className="flex items-center gap-2 w-full">
-                      <Icon className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">{model.name}</span>
-                      <Badge variant="outline" className="ml-auto text-xs flex-shrink-0 border-border/50">
-                        {model.category}
-                      </Badge>
+              <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                <span className="inline-flex items-center gap-1">
+                  <span className={`inline-block h-2 w-2 rounded-full ${statusColor}`} />
+                  {modelStatus==='thinking' && <Loader2 className="h-3 w-3 animate-spin opacity-70" />}
+                  {modelLabel}
+                </span>
+                <span>•</span>
+                <span>{userPlan}</span>
+          </div>
+          {/* Progress bar while thinking */}
+          <div className={`absolute inset-x-0 bottom-0 ${modelStatus==='thinking' ? 'h-1 rounded-full bg-gradient-to-r from-primary/30 via-primary to-primary/30 animate-pulse' : 'h-0 bg-transparent'}`} />
+        </div>
+            <div className="hidden sm:flex items-center gap-1 rounded-md border border-border p-1 bg-card">
+              {([
+                { k: 'FAST', Icon: Zap, label: 'Rápidos' },
+                { k: 'ADVANCED', Icon: Sparkles, label: 'Avançados' },
+                { k: 'CODE', Icon: Code, label: 'Código' },
+              ] as const).map(({ k, Icon, label }) => (
+                <Button
+                  key={k}
+                  size="sm"
+                  variant={selectedCategory === (k as any) ? 'secondary' : 'ghost'}
+                  className={`h-8 px-2 rounded-md ${selectedCategory === (k as any) ? '' : 'text-muted-foreground'}`}
+                  onClick={() => setSelectedCategory(k as any)}
+                >
+                  <Icon className="h-4 w-4 mr-1" /> {label}
+                </Button>
+              ))}
+            </div>
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-[220px] h-9 bg-card border-border/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-primary" />
+                  <SelectValue placeholder="Modelo" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="max-h-[360px] bg-card border-border/50 rounded-xl">
+                {getAvailableModels(userPlan)
+                  .filter(m => {
+                    // Mapear nome para chave (rápidos/avançados/código)
+                    const cat = m.category
+                    if (selectedCategory === 'FAST') return cat.includes('Rápid') || cat.includes('Ilimit')
+                    if (selectedCategory === 'ADVANCED') return cat.includes('Avançad')
+                    if (selectedCategory === 'CODE') return cat.includes('Código')
+                    return true
+                  })
+                  .map(model => {
+                    const Icon = model.icon
+                    return (
+                      <SelectItem key={model.id} value={model.id} className="rounded-lg">
+                        <div className="flex items-center gap-2 w-full">
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{model.name}</span>
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
+              </SelectContent>
+            </Select>
+          </div>
+
+            <div className="flex items-center gap-2">
+              <Button size="sm" className="h-9" onClick={handleNewChat} aria-label="Nova conversa">
+                <Plus className="h-4 w-4 mr-1" />
+                Nova Conversa
+              </Button>
+              {/* Sugestões popover (md/lg) */}
+              <div className="hidden md:block xl:hidden">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-9">Sugestões</Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 animate-in fade-in-0 zoom-in-95">
+                    <div className="text-sm font-semibold mb-2">Sugestões rápidas</div>
+                    <div className="flex flex-col gap-2">
+                      {[ 'Esboçar plano de projeto', 'Gerar checklist de tarefas', 'Sintetizar reunião em bullets' ].map(s => (
+                        <Button key={s} variant="outline" className="h-8 rounded-lg justify-start" onClick={()=>setInput(s)}>
+                          {s}
+                        </Button>
+                      ))}
                     </div>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-xl hover:bg-card"
-            onClick={handleNewChat}
-            disabled={messages.length === 0}
-            title="Nova Conversa"
-          >
-            <RotateCcw className="h-5 w-5" />
-          </Button>
-          <Badge variant="outline" className="ml-1 hidden md:inline-flex border-border/50" title={selectedModel}>
-            {currentModelName}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Messages Area */}
-      <ScrollArea className="flex-1 p-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="max-w-5xl w-full mx-auto">
-              {/* Greeting */}
-              <div className="text-center mb-8">
-                <h1 className="text-3xl font-semibold mb-2">
-                  Hello {session?.user?.name?.split(' ')[0] || 'there'}
-                </h1>
-                <p className="text-lg text-muted-foreground">
-                  What can I do for you today?
-                </p>
+                  </PopoverContent>
+                </Popover>
               </div>
-
-              {/* Category Tabs */}
-              <div className="flex items-center justify-center gap-2 mb-8">
-                <Button
-                  variant="secondary"
-                  className="rounded-full px-6 py-2 bg-purple-100 text-purple-700 hover:bg-purple-200"
-                  onClick={() => toast({ title: "Filtragem em Breve!", description: "A capacidade de filtrar sugestões de prompt por categoria estará disponível em futuras atualizações." })}
-                >
-                  Work
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="rounded-full px-6 py-2"
-                  onClick={() => toast({ title: "Filtragem em Breve!", description: "A capacidade de filtrar sugestões de prompt por categoria estará disponível em futuras atualizações." })}
-                >
-                  Popular
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="rounded-full px-6 py-2"
-                  onClick={() => toast({ title: "Filtragem em Breve!", description: "A capacidade de filtrar sugestões de prompt por categoria estará disponível em futuras atualizações." })}
-                >
-                  Marketing
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full h-10 w-10"
-                  onClick={() => toast({ title: "Mais Opções em Breve!", description: "Funcionalidades adicionais, como ver mais categorias ou adicionar seus próprios prompts, serão implementadas em breve." })}
-                >
-                  <Plus className="h-5 w-5" />
-                </Button>
-              </div>
-
-              {/* Template Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {/* Performance Indicators */}
-                <Card 
-                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200"
-                  onClick={() => setInput("Design a comprehensive KPI framework for tracking business performance metrics")}
-                >
-                  <h3 className="font-semibold text-lg mb-3">Performance Indicators</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Design a comprehensive KPI framework for tracking business performance
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-purple-600">
-                    <Plus className="h-4 w-4" />
-                    <span>PROMPT</span>
-                  </div>
-                </Card>
-
-                {/* Priority Matrix */}
-                <Card 
-                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200"
-                  onClick={() => setInput("Create a strategic prioritization framework for Company/Sector using urgency and importance matrix")}>
-                  <h3 className="font-semibold text-lg mb-3">Priority Matrix</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Create a strategic prioritization framework for Company/Sector...
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-blue-600">
-                    <Plus className="h-4 w-4" />
-                    <span>PROMPT</span>
-                  </div>
-                </Card>
-
-                {/* Strategic Timeline */}
-                <Card 
-                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-cyan-50 to-cyan-100/50 border-cyan-200"
-                  onClick={() => setInput("Develop an implementation roadmap for strategic initiatives with key milestones and dependencies")}>
-                  <h3 className="font-semibold text-lg mb-3">Strategic Timeline</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Develop an implementation roadmap for...
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-cyan-600">
-                    <Plus className="h-4 w-4" />
-                    <span>PROMPT</span>
-                  </div>
-                </Card>
-
-                {/* Decision Criteria */}
-                <Card 
-                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-green-50 to-green-100/50 border-green-200"
-                  onClick={() => setInput("Design a robust decision-making framework for evaluating strategic options and alternatives")}>
-                  <h3 className="font-semibold text-lg mb-3">Decision Criteria</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Design a robust decision-making framework for Type of...
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-green-600">
-                    <Plus className="h-4 w-4" />
-                    <span>PROMPT</span>
-                  </div>
-                </Card>
-
-                {/* Planning Meeting Guide */}
-                <Card 
-                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200"
-                  onClick={() => setInput("Structure an annual strategic planning meeting agenda with objectives and expected outcomes")}>
-                  <h3 className="font-semibold text-lg mb-3">Planning Meeting Guide</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Structure an annual strategic planning
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-orange-600">
-                    <Plus className="h-4 w-4" />
-                    <span>PROMPT</span>
-                  </div>
-                </Card>
-
-                {/* Strategic Communication */}
-                <Card 
-                  className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-violet-50 to-violet-100/50 border-violet-200"
-                  onClick={() => setInput("Develop a strategic communication plan for stakeholder engagement and change management")}>
-                  <h3 className="font-semibold text-lg mb-3">Strategic Communication</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Develop a strategic communication plan for
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-violet-600">
-                    <Plus className="h-4 w-4" />
-                    <span>PROMPT</span>
-                  </div>
-                </Card>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-lg"
+                onClick={() => setChatTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+                title={chatTheme === 'dark' ? 'Tema claro' : 'Tema escuro'}
+              >
+                {chatTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </Button>
             </div>
           </div>
+
+      {/* Messages Area */}
+      <ScrollArea className="flex-1 px-0 py-3 pb-36">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-center">
+            <div className="text-sm text-muted-foreground">Digite sua mensagem para começar</div>
+          </div>
         ) : (
-          <div className="space-y-4 max-w-4xl mx-auto">
-            {messages.map(message => (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${
-                  message.role === 'assistant' ? 'justify-start' : 'justify-end'
-                }`}
-              >
+          <div className="space-y-2.5 max-w-[42rem] mx-auto">
+            {messages.map((message, idx) => (
+              <div key={message.id} className={`group/message flex gap-3 ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
                 {message.role === 'assistant' && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>
+                  <Avatar className="h-8 w-8 ring-2 ring-background">
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
                       <Bot className="h-4 w-4" />
                     </AvatarFallback>
                   </Avatar>
                 )}
-                
-                <Card className={`max-w-[80%] ${
-                  message.role === 'user' ? 'bg-primary text-primary-foreground' : ''
+                <div className={`relative transition-all duration-200 max-w-[560px] md:max-w-[640px] rounded-md px-3 py-2.5 text-sm leading-6 shadow-sm animate-in fade-in-0 ${message.role === 'user' ? 'slide-in-from-right-2' : 'slide-in-from-left-2'} ${
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground hover:shadow-md'
+                    : 'bg-card/80 border border-border/40 text-foreground hover:border-border/50'
                 }`}>
-                  <CardContent className="p-3">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <span className="text-xs opacity-70">
-                        {message.timestamp.toLocaleTimeString('pt-BR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                        {message.model && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {message.model}
-                          </Badge>
-                        )}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleCopy(message.content, message.id)}
-                      >
-                        {copiedId === message.id ? (
-                          <Check className="h-3 w-3" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
+                  {/* Inline actions on hover */}
+                  <div className="absolute -top-2 right-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 bg-background/80 border border-border/60 rounded-lg px-1 py-0.5 shadow-sm">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+                              onClick={() => handleCopy(message.content, message.id)}
+                              aria-label="Copiar"
+                              type="button"
+                            >
+                              {copiedId === message.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Copiar</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {message.role === 'user' && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+                                onClick={() => { setEditingId(message.id); setEditingText(message.content) }}
+                                aria-label="Editar"
+                                type="button"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {message.role === 'assistant' && idx === messages.length - 1 && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+                                onClick={handleRegenerateFromLastUser}
+                                aria-label="Regenerar"
+                                type="button"
+                              >
+                                <RefreshCcw className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Regenerar</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
-                    
-                    {/* Attachments */}
+                  </div>
                     {message.attachments && message.attachments.length > 0 && (
-                      <div className="mb-3 space-y-2">
+                    <div className="mb-2 space-y-1.5">
                         {message.attachments.map((attachment) => (
                           <div key={attachment.id} className="flex items-center gap-2 p-2 bg-background/10 rounded-lg">
-                            {attachment.type.startsWith('image/') ? (
-                              <Image className="h-4 w-4" />
-                            ) : (
-                              <FileText className="h-4 w-4" />
-                            )}
+                          {attachment.type.startsWith('image/') ? <Image className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                             <span className="text-xs truncate flex-1">{attachment.name}</span>
-                            <span className="text-xs opacity-70">{formatFileSize(attachment.size)}</span>
+                          <span className="text-[10px] opacity-70">{formatFileSize(attachment.size)}</span>
                           </div>
                         ))}
                       </div>
                     )}
-                    
-                    <div className="whitespace-pre-wrap text-sm">
-                      {message.content}
+                  {editingId === message.id ? (
+                    <div className="space-y-1">
+                      <Textarea
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        className="min-h-[80px] resize-none border border-border/40 bg-background/60"
+                      />
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <Button size="sm" className="h-7 px-2" onClick={() => { setMessages(prev => prev.map(m => m.id === message.id ? { ...m, content: editingText } : m)); setEditingId(null); setEditingText(''); resendFrom(idx) }}>Reenviar</Button>
+                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => { setEditingId(null); setEditingText('') }}>Cancelar</Button>
                     </div>
-                    {message.tokensUsed && (
-                      <div className="text-xs opacity-50 mt-2">
-                        Tokens: {message.tokensUsed}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-
+                  ) : (
+                    <RenderMessageContent content={message.content} isDark={chatTheme==='dark'} />
+                  )}
+                  <div className="mt-1 flex items-center justify-between text-[10px] opacity-0 transition-opacity group-hover/message:opacity-100">
+                    <span>{message.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        className={`h-5 w-5 inline-flex items-center justify-center rounded ${message.role === 'user' ? 'bg-white/20' : 'bg-background/40'} hover:opacity-90`}
+                        onClick={() => handleCopy(message.content, message.id)}
+                        title="Copiar"
+                      >
+                        {copiedId === message.id ? <Check className="h-2.5 w-2.5" /> : <Copy className="h-2.5 w-2.5" />}
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className={`h-6 w-6 inline-flex items-center justify-center rounded ${message.role === 'user' ? 'bg-white/25' : 'bg-background/40'} hover:opacity-90`} title="Mais ações">⋯</button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align={message.role === 'user' ? 'end' : 'start'} className="w-48">
+                          <DropdownMenuItem className="cursor-pointer" onClick={() => { navigator.clipboard.writeText(message.content) }}>Copiar</DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={() => { setInput(message.content); textareaRef.current?.focus() }}>Usar como prompt</DropdownMenuItem>
+                          {/* Opção de salvar como template removida */}
                 {message.role === 'user' && (
-                  <Avatar className="h-8 w-8">
+                            <>
+                              <DropdownMenuItem className="cursor-pointer" onClick={() => { setEditingId(message.id); setEditingText(message.content) }}>Editar e reenviar</DropdownMenuItem>
+                              <DropdownMenuItem className="cursor-pointer" onClick={() => resendFrom(idx)}>Continuar a partir daqui</DropdownMenuItem>
+                            </>
+                          )}
+                          {message.role === 'assistant' && idx === messages.length - 1 && (
+                            <DropdownMenuItem className="cursor-pointer" onClick={handleRegenerateFromLastUser}>Regenerar</DropdownMenuItem>
+                          )}
+                          {message.role === 'user' && (
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                              let sel = ''
+                              try { sel = (window.getSelection()?.toString() || '').trim() } catch {}
+                              const base = sel || message.content
+                              handleSetConversationTitle(base)
+                            }}>Usar como título da conversa</DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem className="cursor-pointer" onClick={() => setMessages(prev => prev.filter(m => m.id !== message.id))}>Apagar</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                      </div>
+                </div>
+                {message.role === 'user' && (
+                  <Avatar className="h-7 w-7">
                     <AvatarFallback>
-                      <User className="h-4 w-4" />
+                      <User className="h-3.5 w-3.5" />
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -937,37 +1198,39 @@ class HttpError extends Error {
         )}
       </ScrollArea>
 
-      {/* Input Area - Kyroia Style */}
-      <div className="p-4 border-t border-border/50 chat-input-shadow">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-          {/* Attachments Preview */}
-          {attachments.length > 0 && (
-            <div className="mb-3 space-y-2">
-              <div className="text-sm text-muted-foreground">Arquivos anexados:</div>
-              {attachments.map((attachment) => (
-                <div key={attachment.id} className="flex items-center gap-2 p-2 bg-card rounded-lg border border-border/50">
-                  {attachment.type.startsWith('image/') ? (
-                    <Image className="h-4 w-4 text-blue-500" />
-                  ) : (
-                    <FileText className="h-4 w-4 text-green-500" />
-                  )}
-                  <span className="text-sm truncate flex-1">{attachment.name}</span>
-                  <span className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => removeAttachment(attachment.id)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Input Area - Docked overlay */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-3 z-30">
+        <form onSubmit={handleSubmit} className={`pointer-events-auto max-w-3xl mx-auto rounded-lg border ${chatTheme === 'dark' ? 'bg-background/70 border-border/60' : 'bg-card/80 border-border/60'} backdrop-blur supports-[backdrop-filter]:bg-background/50 p-2.5 transition-all duration-200 ${(inputFocused || attachments.length>0 || urlDialogOpen || webSearchEnabled || knowledgeBaseEnabled) ? 'shadow-xl ring-1 ring-primary/20 translate-y-[-1px]' : 'shadow-lg'}`}>
+          {/* Attachments Preview (with transition) */}
+          <div className={`mb-3 transition-all duration-200 overflow-hidden ${attachments.length>0 ? 'opacity-100 max-h-64' : 'opacity-0 max-h-0'}`}>
+            {attachments.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">Arquivos anexados:</div>
+                {attachments.map((attachment) => (
+                  <div key={attachment.id} className="flex items-center gap-2 p-2 bg-card rounded-lg border border-border/50">
+                    {attachment.type.startsWith('image/') ? (
+                      <Image className="h-4 w-4 text-blue-500" />
+                    ) : (
+                      <FileText className="h-4 w-4 text-green-500" />
+                    )}
+                    <span className="text-sm truncate flex-1">{attachment.name}</span>
+                    <span className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => removeAttachment(attachment.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           
-          <div className="relative bg-card rounded-2xl p-2 border border-border/50">
+          <div className={`relative rounded-xl p-2`}>
             <input
               ref={fileInputRef}
               type="file"
@@ -981,113 +1244,15 @@ class HttpError extends Error {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isChatDisabledByLimit ? "Limite atingido. Faça upgrade para continuar." : "Design a comprehensive KPI framework for Area/Department that captures both leading and lagging indicators. Structure metrics to reflect operational efficiency, strategic progress, and stakeholder value creation. Include data collection protocols, reporting frequencies, and intervention thresholds."}
-              className="min-h-[100px] max-h-[200px] resize-none border-0 bg-transparent px-4 pt-4 pb-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
+              onFocus={()=>setInputFocused(true)}
+              onBlur={()=>setInputFocused(false)}
+              placeholder={isChatDisabledByLimit ? "Limite atingido. Faça upgrade para continuar." : "Digite sua mensagem..."}
+              className="min-h-[84px] max-h-[196px] resize-none border-0 bg-transparent px-3 pt-2.5 pb-11 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
               disabled={isLoading || isChatDisabledByLimit}
             />
             {/* Bottom toolbar */}
-            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 rounded-lg text-xs hover:bg-accent"
-                      title="Add"
-                      disabled={isLoading || isChatDisabledByLimit}
-                    >
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Add
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    <DropdownMenuItem 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="cursor-pointer"
-                    >
-                      <Monitor className="mr-2 h-4 w-4" />
-                      From your computer
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => {
-                        toast({
-                          title: "Em breve",
-                          description: "Funcionalidade de arquivos salvos estará disponível em breve.",
-                        })
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <Save className="mr-2 h-4 w-4" />
-                      Saved files
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setUrlDialogOpen(true)}
-                      className="cursor-pointer"
-                    >
-                      <Link className="mr-2 h-4 w-4" />
-                      From URL
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant={webSearchEnabled ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 rounded-lg text-xs hover:bg-accent flex items-center gap-2"
-                  onClick={() => {
-                    setWebSearchEnabled(!webSearchEnabled)
-                    toast({
-                      title: webSearchEnabled ? "Web Search desativado" : "Web Search ativado",
-                      description: webSearchEnabled 
-                        ? "A IA não fará buscas na internet." 
-                        : "A IA pode fazer buscas na internet para responder suas perguntas.",
-                    })
-                  }}
-                >
-                  <Globe className="h-4 w-4" />
-                  <span>Web Search</span>
-                </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Ativa buscas na web como contexto
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant={knowledgeBaseEnabled ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 rounded-lg text-xs hover:bg-accent flex items-center gap-2"
-                  onClick={() => {
-                    setKnowledgeBaseEnabled(!knowledgeBaseEnabled)
-                    toast({
-                      title: knowledgeBaseEnabled ? "Knowledge Base desativada" : "Knowledge Base ativada",
-                      description: knowledgeBaseEnabled 
-                        ? "A IA não usará a base de conhecimento." 
-                        : "A IA usará documentos da base de conhecimento como contexto.",
-                    })
-                  }}
-                >
-                  <BookOpen className="h-4 w-4" />
-                  <span>Knowledge</span>
-                </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Usa documentos da sua base como contexto
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-end">
+              {/* Barra de ferramentas simplificada: removidos anexos, Web Search e Knowledge */}
               
               <Button
                 type="submit"
@@ -1149,7 +1314,8 @@ class HttpError extends Error {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </main>
+    {/* Painel direito removido para UI limpa */}
     </div>
   )
 }

@@ -25,5 +25,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: undefined,
+  webServer: process.env.PW_DISABLE_WEBSERVER
+    ? undefined
+    : {
+        command: 'npm run dev:3025',
+        url: process.env.BASE_URL || 'http://localhost:3025',
+        reuseExistingServer: !process.env.CI,
+        timeout: 120000,
+      },
 });

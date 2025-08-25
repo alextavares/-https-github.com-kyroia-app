@@ -15,15 +15,16 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check for session tokens (both secure and non-secure variants)
-  const sessionToken = request.cookies.get('next-auth.session-token')?.value || 
+  const sessionToken = request.cookies.get('next-auth.session-token')?.value ||
                       request.cookies.get('__Secure-next-auth.session-token')?.value
-  
-  // Additional check for csrf token to improve authentication detection
+
+  // Additional check for csrf token (include __Host- variant used by NextAuth)
   const csrfToken = request.cookies.get('next-auth.csrf-token')?.value ||
-                   request.cookies.get('__Secure-next-auth.csrf-token')?.value
-  
-  // More robust auth detection - check for both tokens
-  const isAuth = !!(sessionToken && csrfToken)
+                   request.cookies.get('__Secure-next-auth.csrf-token')?.value ||
+                   request.cookies.get('__Host-next-auth.csrf-token')?.value
+
+  // Auth detection: session token is sufficient for protected pages
+  const isAuth = !!sessionToken
   const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
   const isPublicPage = request.nextUrl.pathname === '/' || 
                       request.nextUrl.pathname === '/demo-chat' ||
@@ -45,7 +46,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const isPublicApiRoute = request.nextUrl.pathname.startsWith('/api/test-ai-public') || 
-                          request.nextUrl.pathname.startsWith('/api/chat') ||
+                          request.nextUrl.pathname.startsWith('/api/templates') ||
                           request.nextUrl.pathname.startsWith('/api/test-stream-public') ||
                           request.nextUrl.pathname.startsWith('/api/public/') ||
                           request.nextUrl.pathname === '/api/health' ||

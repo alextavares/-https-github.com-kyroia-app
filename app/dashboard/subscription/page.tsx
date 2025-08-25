@@ -253,9 +253,20 @@ export default function SubscriptionPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-lg bg-${planDetails.color}-100 dark:bg-${planDetails.color}-900`}>
-                <PlanIcon className={`h-6 w-6 text-${planDetails.color}-600 dark:text-${planDetails.color}-400`} />
-              </div>
+              {(() => {
+                const plan = subscription?.planType || 'FREE'
+                const colorMap: Record<string, { box: string; icon: string }> = {
+                  FREE: { box: 'bg-gray-100 dark:bg-gray-900', icon: 'text-gray-600 dark:text-gray-300' },
+                  PRO: { box: 'bg-blue-100 dark:bg-blue-900', icon: 'text-blue-600 dark:text-blue-300' },
+                  ENTERPRISE: { box: 'bg-purple-100 dark:bg-purple-900', icon: 'text-purple-600 dark:text-purple-300' },
+                }
+                const cls = colorMap[plan] || colorMap.FREE
+                return (
+                  <div className={`p-3 rounded-lg ${cls.box}`}>
+                    <PlanIcon className={`h-6 w-6 ${cls.icon}`} />
+                  </div>
+                )
+              })()}
               <div>
                 <CardTitle>{planDetails.name}</CardTitle>
                 <CardDescription>

@@ -14,27 +14,19 @@ const updateKnowledgeSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params
+  const { id } = params
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const knowledge = await prisma.knowledgeBase.findFirst({
       where: {
         id: id,
-        userId: user.id,
+        userId: session.user.id,
       },
       select: {
         id: true,
@@ -64,39 +56,26 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params
+  const { id } = params
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const body = await request.json()
     const validatedData = updateKnowledgeSchema.parse(body)
 
-    const knowledge = await prisma.knowledgeBase.updateMany({
-      where: {
-        id: id,
-        userId: user.id,
-      },
-      data: validatedData
-    })
-
-    if (knowledge.count === 0) {
-      return NextResponse.json({ error: 'Knowledge not found' }, { status: 404 })
+    const existing = await prisma.knowledgeBase.findUnique({ where: { id } })
+    if (!existing) return NextResponse.json({ error: 'Knowledge not found' }, { status: 404 })
+    if ('userId' in (existing as any) && (existing as any).userId !== session.user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return NextResponse.json({ success: true })
+    const updated = await prisma.knowledgeBase.update({ where: { id }, data: validatedData })
+    return NextResponse.json(updated)
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -115,39 +94,17 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params
+  const { id } = params
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Soft delete
-    const knowledge = await prisma.knowledgeBase.updateMany({
-      where: {
-        id: id,
-        userId: user.id,
-      },
-      data: {
-        isActive: false
-      }
-    })
-
-    if (knowledge.count === 0) {
-      return NextResponse.json({ error: 'Knowledge not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ success: true })
+    await prisma.knowledgeBase.delete({ where: { id } })
+    return new Response(null, { status: 204 })
   } catch (error) {
     console.error('Error deleting knowledge:', error)
     return NextResponse.json(
@@ -156,3 +113,6 @@ export async function DELETE(
     )
   }
 }
+
+// Compatibility: tests import PUT; map to PATCH
+export { PATCH as PUT }

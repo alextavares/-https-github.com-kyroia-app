@@ -2,11 +2,10 @@ import { prisma } from '@/lib/prisma';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { PaymentStatus, normalizePaymentStatus } from '@/lib/constants/payment-status';
 
-// Initialize the MercadoPago client
+// Initialize the MercadoPago client (tolerant to missing env in tests)
 const client = new MercadoPagoConfig({ 
-  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
+  accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || 'test',
 });
-const payment = new Payment(client);
 
 interface WebhookPayload {
   type: string;
@@ -27,7 +26,9 @@ export async function updateSubscriptionFromWebhook(payload: WebhookPayload) {
   }
 
   try {
-    const paymentDetails = await payment.get({ id: payload.data.id });
+    // Instantiate Payment at call-time so Jest mocks can override
+    const mpPayment = new Payment(client);
+    const paymentDetails = await mpPayment.get({ id: payload.data.id });
 
     if (!paymentDetails || !paymentDetails.external_reference) {
       throw new Error(`Payment details or external_reference (userId) not found for payment ID: ${payload.data.id}`);

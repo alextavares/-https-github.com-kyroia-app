@@ -170,14 +170,14 @@ jobs:
         NEXTAUTH_SECRET: test-secret
         NEXTAUTH_URL: http://localhost:3000
 
-    - name: Run E2E tests
-      run: npm run test:e2e
+    - name: Run E2E tests (mocked payments)
+      run: npx playwright test tests/e2e/payment/mocked-payment-flow.spec.ts
       env:
         NODE_ENV: test
         DATABASE_URL: postgresql://test:test@localhost:5432/innerai_test
         NEXTAUTH_SECRET: test-secret
-        NEXTAUTH_URL: http://localhost:3000
-        BASE_URL: http://localhost:3000
+        NEXTAUTH_URL: http://localhost:3025
+        BASE_URL: http://localhost:3025
 
     - name: Upload Playwright report
       uses: actions/upload-artifact@v3

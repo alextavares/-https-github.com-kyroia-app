@@ -2,51 +2,30 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth/guards'
 import { setPublicCache, setNoStore } from '@/lib/cache/headers'
-import { handleRoute, DomainError } from '@/lib/http/errors'
+import { DomainError } from '@/lib/http/errors'
 import { z } from 'zod'
-import { validateWith } from '@/lib/validation/zod-helpers'
 
 export async function GET(request: Request) {
-    // GET de templates públicos não exige auth; aplicar cache público moderado
-    const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category')
+  const { searchParams } = new URL(request.url)
+  const category = searchParams.get('category')
+  const search = searchParams.get('search')
 
-    // Categoria é string no schema atual; evitamos usar enum do Prisma que não existe/exporta
-    const whereClause: { isPublic: true; category?: string } = { isPublic: true }
+  const auth = await requireAuth()
+  const userId = auth.ok ? auth.userId : null
 
-    if (category) {
-      const normalized = category.toUpperCase()
-      // Se houver uma lista de categorias válidas em domínio separado, validar aqui.
-      // Por ora, aceitamos string normalizada.
-      whereClause.category = normalized
-    }
+  const where: any = {
+    OR: [
+      ...(userId ? [{ userId }] as any[] : []),
+      { isPublic: true },
+    ],
+  }
+  if (category) where.category = category
+  if (search) where.name = { contains: search, mode: 'insensitive' }
 
-    // Se o modelo não existir no schema atual, retorne array vazio
-    const templates = await (async () => {
-      try {
-        return await prisma.promptTemplate.findMany({
-          where: whereClause,
-          orderBy: [
-            { usageCount: 'desc' },
-            { createdAt: 'desc' }
-          ],
-          include: {
-            creator: {
-              select: {
-                name: true,
-                email: true
-              }
-            }
-          }
-        } as any)
-      } catch {
-        return [] as any[]
-      }
-    })()
-
-    const res = NextResponse.json(templates)
-    setPublicCache(res, 300, 600)
-    return res
+  const rows = await (prisma as any).template.findMany({ where, orderBy: { createdAt: 'desc' } })
+  const res = NextResponse.json(rows)
+  setPublicCache(res, 60, 120)
+  return res
 }
 
 const postSchema = z.object({
@@ -55,65 +34,58 @@ const postSchema = z.object({
   category: z.string().min(2),
   templateContent: z.string().min(1),
   variables: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
   isPublic: z.boolean().optional(),
 })
 
 export async function POST(request: Request) {
-    const auth = await requireAuth()
-    if (!auth.ok) {
-      const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
+  const auth = await requireAuth()
+  if (!auth.ok) {
+    const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
+    setNoStore(res)
+    return res
+  }
+
+  const body = await request.json()
+  const name = body?.name as string | undefined
+  const content = body?.content as string | undefined
+  const category = body?.category as string | undefined
+  const variables = (body?.variables as string[] | undefined) ?? []
+  const isPublic = Boolean(body?.isPublic)
+  const description = body?.description as string | undefined
+
+  if (!name || !content || !category) {
+    const res = NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
+    setNoStore(res)
+    return res
+  }
+
+  // Validar variáveis presentes no conteúdo
+  const requiredVars = Array.from(content.matchAll(/\{\{(.*?)\}\}/g)).map((m) => m[1])
+  const missing = requiredVars.filter((v) => !variables.includes(v))
+  if (missing.length > 0) {
+    const res = NextResponse.json({ error: `variáveis faltando: ${missing.join(', ')}` }, { status: 400 })
+    setNoStore(res)
+    return res
+  }
+
+  // Limite de templates para plano FREE
+  let userRow: any = null
+  try { userRow = await (prisma.user.findUnique as any)({ where: { id: auth.userId } }) } catch {}
+  const plan = (userRow?.plan || userRow?.planType || 'FREE') as string
+  if (plan === 'FREE') {
+    const existing = await (prisma as any).template.findMany({ where: { userId: auth.userId } })
+    if (existing.length >= 5) {
+      const res = NextResponse.json({ error: 'Limite de templates atingido para o plano gratuito' }, { status: 403 })
       setNoStore(res)
       return res
     }
+  }
 
-    const user = await prisma.user.findUnique({
-      where: { id: auth.userId },
-      select: { id: true },
-    })
-
-    if (!user) {
-      throw new DomainError('NOT_FOUND', 'Usuário não encontrado')
-    }
-
-    const json = await request.json()
-    const parsed = await validateWith(postSchema, json)
-    if (parsed instanceof Response) return parsed
-
-    const categoryUpper = parsed.category.toUpperCase()
-    // Opcional: validar contra lista interna; mantemos livre enquanto não há enum exportado do Prisma.
-
-    let template: any
-    try {
-      template = await prisma.promptTemplate.create({
-        data: {
-          name: parsed.name,
-          description: parsed.description,
-          category: categoryUpper,
-          templateContent: parsed.templateContent,
-          variables: parsed.variables ? JSON.stringify(parsed.variables) : null,
-          isPublic: parsed.isPublic ?? true,
-          createdBy: user.id,
-        },
-        include: {
-          creator: { select: { name: true, email: true } }
-        }
-      } as any)
-    } catch {
-      // Se o modelo não existir, degrade com echo dos dados básicos
-      template = {
-        id: `tpl_${Date.now()}`,
-        name: parsed.name,
-        description: parsed.description ?? null,
-        category: categoryUpper,
-        templateContent: parsed.templateContent,
-        variables: parsed.variables ?? [],
-        isPublic: parsed.isPublic ?? true,
-        createdBy: user.id,
-        createdAt: new Date().toISOString(),
-      }
-    }
-
-    const res = NextResponse.json(template, { status: 201 })
-    setNoStore(res)
-    return res
+  const created = await (prisma as any).template.create({
+    data: { name, content, category, variables, isPublic, userId: auth.userId, ...(description ? { description } : {}) },
+  })
+  const res = NextResponse.json(created, { status: 201 })
+  setNoStore(res)
+  return res
 }

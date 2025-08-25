@@ -24,115 +24,69 @@ type JsonMessage = {
   createdAt?: string | number | Date
 } | null
 
-export async function GET() {
-  return handleRoute(async () => {
-    const auth = await requireAuth()
-    if (!auth.ok) {
-      return Unauthorized('Não autorizado')
-    }
-    const userId = auth.userId
+export const GET = handleRoute(async (req: Request) => {
+  const auth = await requireAuth()
+  if (!auth.ok) return Unauthorized('Não autorizado')
 
-    // Coleta dados relevantes das conversas do usuário
-    const conversations = await prisma.conversation.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        updatedAt: true,
-        modelUsed: true,
-        messages: true,
-      },
-      take: 200, // limite razoável para cálculo rápido; ajuste conforme necessidade
-    })
+  const url = new URL(req.url)
+  const includeProjections = url.searchParams.get('includeProjections') === 'true'
 
-    // Agrega métricas a partir de messages: Json[]
-    let totalMessages = 0
-    let totalTokens = 0 // se tokensUsed existir nos itens Json; caso não, permanece 0
-    const dailyMap = new Map<string, DailyPoint>()
+  const totalMessages: number = await (prisma as any).message.count({ where: { userId: auth.userId } })
+  const totalConversations: number = await (prisma as any).conversation.count({ where: { userId: auth.userId } })
 
-    conversations.forEach((conv) => {
-      const msgs = Array.isArray(conv.messages) ? conv.messages : []
-      msgs.forEach((m) => {
-        const msg = m as unknown as JsonMessage
-        if (!msg || typeof msg !== 'object') return
-        totalMessages += 1
-
-        // tokensUsed é opcional; se presente e numérico, acumula
-        const tu = (msg as Record<string, unknown>)['tokensUsed']
-        const tokens = typeof tu === 'number' ? tu : 0
-        totalTokens += tokens
-
-        // data do ponto diário: usa createdAt da mensagem se existir, senão createdAt da conversa
-        const createdVal = msg?.createdAt
-        let dt: Date
-        if (createdVal instanceof Date) {
-          dt = createdVal
-        } else if (typeof createdVal === 'string' || typeof createdVal === 'number') {
-          const d = new Date(createdVal)
-          dt = d
-        } else {
-          dt = new Date(conv.createdAt)
-        }
-
-        if (!isNaN(dt.getTime())) {
-          const key = dt.toISOString().split('T')[0]
-          if (!dailyMap.has(key)) {
-            dailyMap.set(key, { date: key, messages: 0, tokens: 0, cost: 0 })
-          }
-          const dp = dailyMap.get(key)!
-          dp.messages += 1
-          dp.tokens += tokens
-          // custo não é rastreado no schema atual → permanece 0
-        }
-      })
-    })
-
-    // Conversas recentes (top 5)
-    const recentActivity = conversations.slice(0, 5).map((c) => ({
-      id: c.id,
-      title: c.title,
-      createdAt: c.createdAt,
-      modelUsed: c.modelUsed,
-      // Em ausência de tabela Message, aproximamos "qtd de mensagens" pelo length do Json[]
-      _count: { messages: Array.isArray(c.messages) ? c.messages.length : 0 },
-    }))
-
-    // Uso por modelo (contagem de conversas por modelUsed)
-    const modelUsageMap = new Map<string, { count: number; tokens: number }>()
-    conversations.forEach((c) => {
-      const model = c.modelUsed ?? 'unknown'
-      const prev = modelUsageMap.get(model) ?? { count: 0, tokens: 0 }
-      const msgs = Array.isArray(c.messages) ? c.messages : []
-      const tokensFromConv = msgs.reduce<number>((acc, m) => {
-        const jm = m as unknown as Record<string, unknown>
-        const tu = jm['tokensUsed']
-        return acc + (typeof tu === 'number' ? tu : 0)
-      }, 0)
-      modelUsageMap.set(model, { count: prev.count + 1, tokens: prev.tokens + tokensFromConv })
-    })
-
-    const chartData = Array.from(dailyMap.values()).sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    )
-
-    const res = NextResponse.json({
-      overview: {
-        totalMessages,
-        totalConversations: conversations.length,
-        totalCost: 0, // custo não disponível no schema atual
-        totalTokens,
-      },
-      chartData,
-      recentActivity,
-      modelUsage: Array.from(modelUsageMap.entries()).map(([model, v]) => ({
-        model,
-        count: v.count,
-        tokens: v.tokens,
-      })),
-    })
-    setNoStore(res)
-    return res
+  const grouped = await (prisma as any).message.groupBy({
+    by: ['modelId'],
+    _count: { id: true },
+    where: { userId: auth.userId },
   })
-}
+
+  const usageRows = await (prisma as any).usage.findMany({ where: { userId: auth.userId }, orderBy: { date: 'desc' }, take: 14 })
+  const conversations = await (prisma as any).conversation.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: 'desc' }, take: 10 })
+
+  const mostUsed = grouped.reduce((acc: any, it: any) => (it._count.id > acc._count.id ? it : acc), grouped[0] || { modelId: 'unknown', _count: { id: 0 } })
+  const modelUsage = grouped.map((g: any) => ({
+    model: g.modelId,
+    count: g._count.id,
+    percentage: totalMessages ? Math.round((g._count.id / totalMessages) * 100) : 0,
+  }))
+
+  const costTrends = (usageRows as Array<any>).map((u) => ({
+    date: new Date(u.date).toISOString(),
+    cost: u.cost ?? 0,
+    tokens: u.tokenCount ?? 0,
+  }))
+
+  const topConversations = (conversations as Array<any>).map((c) => ({
+    title: c.title,
+    messageCount: c.messageCount ?? 0,
+    lastActive: new Date(c.lastMessageAt ?? c.createdAt).toISOString(),
+    model: c.modelId ?? 'unknown',
+  }))
+
+  const response: any = {
+    summary: {
+      totalMessages,
+      totalConversations,
+      averageMessagesPerConversation: totalConversations ? totalMessages / totalConversations : 0,
+      mostUsedModel: mostUsed?.modelId ?? 'unknown',
+    },
+    modelUsage,
+    costTrends,
+    topConversations,
+  }
+
+  if (includeProjections) {
+    const last7 = usageRows.slice(0, 7)
+    const dailyAvg = last7.length ? last7.reduce((s: number, d: any) => s + (d.cost ?? 0), 0) / last7.length : 0
+    response.projections = {
+      dailyAverage: Number(dailyAvg.toFixed(2)),
+      weeklyEstimate: Number((dailyAvg * 7).toFixed(2)),
+      monthlyEstimate: Number((dailyAvg * 30).toFixed(2)),
+      recommendation: dailyAvg > 5 ? 'Considere otimizar custos de modelos' : 'Uso dentro do esperado',
+    }
+  }
+
+  const res = NextResponse.json(response)
+  setNoStore(res)
+  return res
+})

@@ -46,7 +46,7 @@ const mapKyroiaModel = (model: KyroiaModel): AIModel => {
   const getBadge = () => {
     if (model.id === 'gpt-4o-mini') return { text: 'Recomendado', variant: 'default' as const }
     if (model.id === 'claude-3.5-haiku') return { text: 'Mais rápido', variant: 'outline' as const }
-    if (model.id === 'gemini-2.5-flash') return { text: '1M tokens', variant: 'secondary' as const }
+    if (model.id === 'gemini-2.5-flash' || model.id === 'gemini-2-flash-free') return { text: '1M tokens', variant: 'secondary' as const }
     if (model.id === 'deepseek-r1') return { text: 'Popular', variant: 'secondary' as const }
     if (model.category === 'reasoning') return { text: 'Raciocínio', variant: 'destructive' as const }
     if (model.planRequired === 'PRO') return { text: 'PRO', variant: 'default' as const }
@@ -106,7 +106,7 @@ function computeModelsForPlan(plan: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'): AIM
   }
 }
 
-export function ModelSelector() {
+export function ModelSelector({ compact = false }: { compact?: boolean }) {
   const [planType, setPlanType] = useState<'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'>('FREE')
   const [models, setModels] = useState<AIModel[]>(computeModelsForPlan('FREE'))
   const [selectedModel, setSelectedModel] = useState<AIModel>(computeModelsForPlan('FREE')[0])
@@ -114,6 +114,18 @@ export function ModelSelector() {
   // Load plan + saved model from localStorage
   useEffect(() => {
     try {
+      // Query param helper: /dashboard?resetModels=1 -> limpa storage e reseta
+      try {
+        const url = new URL(window.location.href)
+        if (url.searchParams.get('resetModels') === '1') {
+          localStorage.removeItem('selectedModel')
+          ;(['FREE','LITE','PRO','ENTERPRISE'] as const).forEach(p => localStorage.removeItem(`selectedModel:${p}`))
+          localStorage.removeItem('lastPlanType')
+          url.searchParams.delete('resetModels')
+          window.history.replaceState({}, '', url.toString())
+        }
+      } catch {}
+
       const savedPlan = localStorage.getItem('lastPlanType') as typeof planType | null
       if (savedPlan === 'FREE' || savedPlan === 'LITE' || savedPlan === 'PRO' || savedPlan === 'ENTERPRISE') {
         setPlanType(savedPlan)
@@ -121,11 +133,18 @@ export function ModelSelector() {
         setModels(ms)
         setSelectedModel(ms[0])
       }
-      const savedModelId = localStorage.getItem(`selectedModel:${savedPlan ?? 'FREE'}`)
+      // Tentar chave global sem plano primeiro (compatibilidade com ChatInput)
+      const globalSelected = localStorage.getItem('selectedModel')
+      const savedModelId = globalSelected || localStorage.getItem(`selectedModel:${savedPlan ?? 'FREE'}`)
       if (savedModelId) {
         const found = computeModelsForPlan(savedPlan ?? 'FREE').find(m => m.id === savedModelId)
         if (found) setSelectedModel(found)
       }
+    } catch {}
+    try {
+      const ms = computeModelsForPlan(planType)
+      // eslint-disable-next-line no-console
+      console.info('[ModelSelector] init plan=', planType, 'models=', ms.map(m => m.id))
     } catch {}
   }, [])
 
@@ -145,6 +164,8 @@ export function ModelSelector() {
           if (!ms.some(m => m.id === selectedModel.id)) {
             setSelectedModel(ms[0])
           }
+          // eslint-disable-next-line no-console
+          console.info('[ModelSelector] api plan=', pt, 'models=', ms.map(m => m.id))
         }
       } catch {}
     }
@@ -154,7 +175,9 @@ export function ModelSelector() {
 
   const handleModelSelect = (model: AIModel) => {
     setSelectedModel(model)
+    // Salvar nos dois formatos para compatibilidade com outras partes da app
     localStorage.setItem(`selectedModel:${planType}`, model.id)
+    localStorage.setItem('selectedModel', model.id)
   }
 
   const getSpeedIcon = (speed: string) => {
@@ -192,7 +215,7 @@ export function ModelSelector() {
 
   const renderModelGroup = (modelList: AIModel[], title: string) => (
     <div key={title}>
-      <DropdownMenuLabel className="text-text-secondary text-xs font-semibold">
+      <DropdownMenuLabel className={cn("text-text-secondary font-semibold", compact ? "text-[11px]" : "text-xs") }>
         {title}
       </DropdownMenuLabel>
       {modelList.map((model) => (
@@ -200,7 +223,8 @@ export function ModelSelector() {
           key={model.id}
           onSelect={() => handleModelSelect(model)}
           className={cn(
-            "flex flex-col items-start space-y-2 p-3 cursor-pointer transition-all duration-200",
+            "flex flex-col items-start cursor-pointer transition-all duration-200",
+            compact ? "space-y-1.5 p-2" : "space-y-2 p-3",
             "hover:bg-surface hover:shadow-soft rounded-md mx-1",
             selectedModel.id === model.id && "bg-primary/10 border-l-2 border-primary"
           )}
@@ -209,7 +233,7 @@ export function ModelSelector() {
             <div className="flex items-center space-x-2">
               <div className="text-primary">{model.icon}</div>
               <div className="flex flex-col">
-                <span className="font-medium text-text-primary">{model.name}</span>
+                <span className={cn("font-medium text-text-primary", compact ? "text-[13px]" : undefined)}>{model.name}</span>
                 <span className="text-xs text-text-tertiary">{model.provider}</span>
               </div>
             </div>
@@ -266,33 +290,34 @@ export function ModelSelector() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button 
+          data-testid="model-selector-trigger"
           variant="outline" 
-          className="min-w-[240px] justify-between bg-card hover:bg-card-hover 
-                     border-border hover:border-primary/50 shadow-soft hover:shadow-soft-md
-                     text-text-primary transition-all duration-300"
+          className={cn(
+            "w-auto justify-between bg-card hover:bg-card-hover border-border hover:border-primary/50 shadow-soft hover:shadow-soft-md text-text-primary transition-all duration-300 shrink-0",
+            compact ? "min-w-[200px] md:min-w-[240px] h-8 px-3" : "min-w-[240px] md:min-w-[280px] h-9 px-4"
+          )}
         >
-          <div className="flex items-center space-x-3">
+          <div className={cn("flex items-center", compact ? "gap-2" : "gap-3") }>
             <div className="text-primary">{selectedModel.icon}</div>
-            <div className="flex flex-col items-start">
-              <span className="font-medium">{selectedModel.name}</span>
-              <span className="text-xs text-text-secondary">{selectedModel.provider}</span>
+            <div className="flex flex-col items-start leading-tight">
+              <span className={cn("font-medium", compact ? "text-sm" : undefined)}>{selectedModel.name}</span>
+              <span className={cn("text-text-secondary", compact ? "text-[11px]" : "text-xs")}>{selectedModel.provider}</span>
             </div>
           </div>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[420px] bg-card border-border shadow-soft-lg">
-        <div className="p-2">
-          <DropdownMenuLabel className="text-text-primary font-semibold text-base">
+      <DropdownMenuContent align="start" className={cn("bg-card border-border shadow-soft-lg rounded-xl", compact ? "w-[400px] md:w-[440px]" : "w-[480px] md:w-[520px]") }>
+        <div className={cn(compact ? "p-2" : "p-3") }>
+          <DropdownMenuLabel className={cn("text-text-primary font-semibold", compact ? "text-sm" : "text-base") }>
             🤖 Selecione um Modelo de IA
           </DropdownMenuLabel>
-          <p className="text-xs text-text-secondary mt-1 mb-3">
+          <p className={cn("text-text-secondary", compact ? "text-[11px] mt-0.5 mb-2" : "text-xs mt-1 mb-3") }>
             Escolha o modelo ideal para sua tarefa
           </p>
           <DropdownMenuSeparator className="bg-border" />
         </div>
-        
-        <div className="max-h-96 overflow-y-auto">
+        <div className={cn("overflow-y-auto", compact ? "max-h-72" : "max-h-96") }>
           {fastModels.length > 0 && renderModelGroup(fastModels, getCategoryLabel('fast'))}
           {advancedModels.length > 0 && renderModelGroup(advancedModels, getCategoryLabel('advanced'))}
           {reasoningModels.length > 0 && renderModelGroup(reasoningModels, getCategoryLabel('reasoning'))}

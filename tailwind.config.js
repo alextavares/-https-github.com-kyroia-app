@@ -7,6 +7,24 @@ const config = {
     ],
     theme: {
         extend: {
+            fontFamily: {
+                sans: [
+                    'var(--font-sans)',
+                    '"DM Sans"',
+                    'Inter',
+                    '-apple-system',
+                    'BlinkMacSystemFont',
+                    "'Segoe UI'",
+                    'Roboto',
+                    'Oxygen',
+                    'Ubuntu',
+                    'Cantarell',
+                    '"Open Sans"',
+                    '"Helvetica Neue"',
+                    'sans-serif',
+                ],
+                'dm-sans': ['"DM Sans"', 'sans-serif'],
+            },
             colors: {
                 // Cores customizadas do Kyroia
                 primary: {

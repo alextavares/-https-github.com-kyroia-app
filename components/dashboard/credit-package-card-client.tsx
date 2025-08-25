@@ -14,7 +14,7 @@ interface CreditPackageCardProps {
     price: number
     originalPrice?: number | null
     discount?: string | null
-    icon?: any
+    iconKey?: 'coins' | 'star' | 'crown'
     color?: string
     borderColor?: string
     features?: string[]
@@ -24,7 +24,13 @@ interface CreditPackageCardProps {
 
 export function CreditPackageCardClient({ pkg }: CreditPackageCardProps) {
   const [isNavigating, setIsNavigating] = useState(false)
-  const Icon = pkg.icon
+  // Map safe string keys to actual icon components inside the Client Component
+  const iconMap = {
+    coins: Coins,
+    star: Star,
+    crown: Crown,
+  } as const
+  const Icon = pkg.iconKey ? iconMap[pkg.iconKey] : undefined
   
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()

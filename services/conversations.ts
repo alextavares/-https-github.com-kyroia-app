@@ -19,13 +19,18 @@ export type ConversationCreateInput = {
 export type ConversationUpdateInput = {
   title?: string;
   isArchived?: boolean;
+  isPinned?: boolean;
+  isFavorite?: boolean;
 };
 
 export const ConversationsService = {
   async listByUser(userId: string): Promise<ConversationSummary[]> {
     const rows = await prisma.conversation.findMany({
       where: { userId },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [
+        { isPinned: "desc" },
+        { updatedAt: "desc" },
+      ],
       select: {
         id: true,
         title: true,
@@ -33,6 +38,8 @@ export const ConversationsService = {
         updatedAt: true,
         modelUsed: true,
         isArchived: true,
+        isPinned: true,
+        isFavorite: true,
         _count: { select: { messages: true } },
       },
     });
@@ -51,6 +58,8 @@ export const ConversationsService = {
         modelUsed: modelUsed ?? "gpt-3.5-turbo",
         userId,
         isArchived: false,
+        isPinned: false,
+        isFavorite: false,
       },
     });
   },
@@ -76,6 +85,8 @@ export const ConversationsService = {
       data: {
         ...(data.title !== undefined && { title: data.title }),
         ...(data.isArchived !== undefined && { isArchived: data.isArchived }),
+        ...(data.isPinned !== undefined && { isPinned: data.isPinned }),
+        ...(data.isFavorite !== undefined && { isFavorite: data.isFavorite }),
       },
     });
   },

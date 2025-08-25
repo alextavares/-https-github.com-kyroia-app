@@ -15,7 +15,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
+  SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import {
   MessageSquare,
@@ -42,42 +45,22 @@ import { Badge } from '@/components/ui/badge'
 import { signOut } from 'next-auth/react'
 import { CreditBalance } from '@/components/dashboard/credit-balance'
 
-const menuItems = [
-  {
-    title: 'Início',
-    href: '/dashboard',
-    icon: Home,
-  },
+// Menu mais limpo: manter apenas o essencial
+const primaryItems = [
   {
     title: 'Chat',
     href: '/dashboard/chat',
     icon: MessageSquare,
+    description: 'Converse com IA',
   },
+]
+
+const accountItems = [
   {
-    title: 'Templates',
-    href: '/dashboard/templates',
-    icon: FileText,
-  },
-  {
-    title: 'Base de Conhecimento',
-    href: '/dashboard/knowledge',
-    icon: BookOpen,
-  },
-  {
-    title: 'Cursos',
-    href: '/dashboard/courses',
-    icon: GraduationCap,
-  },
-  {
-    title: 'Ferramentas',
-    href: '/dashboard/tools',
-    icon: Briefcase,
-  },
-  {
-    title: 'Biblioteca',
-    href: '/dashboard/library',
-    icon: Library,
-    hasDropdown: true,
+    title: 'Configurações',
+    href: '/dashboard/settings',
+    icon: Settings,
+    description: 'Perfil e preferências',
   },
 ]
 
@@ -105,40 +88,51 @@ export function DashboardSidebar() {
   }, [session?.user?.id])
 
   return (
-    <Sidebar 
-      className="w-[280px] border-r-0 hide-scrollbar sidebar-dark bg-gray-900 text-white"
-      style={{ 
-        backgroundColor: '#111827', 
-        color: 'white',
-        minHeight: '100vh'
+    <Sidebar
+      collapsible="icon"
+      className="hide-scrollbar border-r border-border bg-background text-foreground"
+      style={{
+        minHeight: '100vh',
+        ['--sidebar-width' as any]: '16rem',
+        ['--sidebar-width-icon' as any]: '3rem',
+        ['--sidebar-active-bg' as any]: 'hsl(var(--primary) / 0.08)',
       }}
     >
-      <SidebarHeader className="p-4" style={{ backgroundColor: '#111827' }}>
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-            <span className="text-xl font-bold text-purple-400">AI</span>
-          </div>
-          <span className="text-xl font-semibold text-white">Kyroia</span>
-        </Link>
+      {/* Rail clicável para colapsar/expandir (desktop) */}
+      <SidebarRail />
+
+      <SidebarHeader className="px-3 py-3 border-b border-border bg-background">
+        <div className="flex items-center justify-between gap-2">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-sm">
+              <span className="text-xl font-bold text-white">K</span>
+            </div>
+            <span className="text-xl font-semibold group-data-[collapsible=icon]:hidden">Kyroia</span>
+          </Link>
+          {/* Botão de colapso para desktop */}
+          <SidebarTrigger className="hidden md:inline-flex" />
+        </div>
       </SidebarHeader>
       
-      <SidebarContent className="px-3 hide-scrollbar" style={{ backgroundColor: '#111827', color: 'white' }}>
+      <SidebarContent className="px-3 py-5 hide-scrollbar bg-background text-foreground">
         <SidebarGroup>
+          <SidebarGroupLabel className="px-3 text-xs font-medium text-muted-foreground">Principal</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
+            <SidebarMenu className="space-y-1.5">
+              {primaryItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={pathname === item.href}
-                    className="h-12 rounded-xl hover:bg-gray-800/50 data-[active=true]:bg-gray-800 text-gray-300 hover:text-white data-[active=true]:text-white"
+                    tooltip={{ children: item.title, className: 'rounded-md text-xs' }}
+                    className="h-12 rounded-lg border transition-all duration-300 ease-out hover:bg-muted/60 data-[active=true]:bg-[var(--sidebar-active-bg)] data-[active=true]:border-primary/40 data-[active=true]:ring-1 data-[active=true]:ring-primary/20 data-[active=true]:text-primary group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                   >
                     <Link href={item.href} className="flex items-center gap-3 px-3">
-                      <item.icon className="h-5 w-5" />
-                      <span className="text-base">{item.title}</span>
-                      {item.hasDropdown && (
-                        <ChevronDown className="h-4 w-4 ml-auto" />
-                      )}
+                      <item.icon className="h-5 w-5 group-data-[collapsible=icon]:h-6 group-data-[collapsible=icon]:w-6 transition-transform duration-300 group-hover:scale-105 flex-shrink-0" />
+                      <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                        <span className="text-sm font-medium">{item.title}</span>
+                        <span className="text-xs text-muted-foreground">{item.description}</span>
+                      </div>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -147,69 +141,66 @@ export function DashboardSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Credit Balance Section */}
-        <div className="mx-3 mb-4">
-          <CreditBalance />
-        </div>
+        <SidebarSeparator className="my-4" />
 
-        {/* Upgrade Section */}
-        <div className="mt-auto mb-4 mx-3">
-          <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-4 rounded-2xl text-white">
-            <h3 className="font-semibold mb-1">Você está no plano {userPlan === 'FREE' ? 'Free' : userPlan}</h3>
-            <p className="text-sm opacity-90 mb-3">
-              Faça upgrade para desbloquear funcionalidades disponíveis
-            </p>
-            <Button 
-              asChild
-              variant="secondary" 
-              className="w-full bg-white/20 hover:bg-white/30 backdrop-blur text-white border-0"
-            >
-              <Link href="/dashboard/subscription">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Fazer upgrade
-              </Link>
-            </Button>
-          </div>
-        </div>
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-3 text-xs font-medium text-muted-foreground">Conta</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1.5">
+              {accountItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={{ children: item.title, className: 'rounded-md text-xs' }}
+                    className="h-12 rounded-lg border transition-all duration-300 ease-out hover:bg-muted/60 data-[active=true]:bg-[var(--sidebar-active-bg)] data-[active=true]:border-primary/40 data-[active=true]:ring-1 data-[active=true]:ring-primary/20 data-[active=true]:text-primary group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                  >
+                    <Link href={item.href} className="flex items-center gap-3 px-3">
+                      <item.icon className="h-5 w-5 group-data-[collapsible=icon]:h-6 group-data-[collapsible=icon]:w-6 transition-transform duration-300 group-hover:scale-105 flex-shrink-0" />
+                      <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                        <span className="text-sm font-medium">{item.title}</span>
+                        <span className="text-xs text-muted-foreground">{item.description}</span>
+                      </div>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Seções de créditos/upgrade ocultadas para um layout mais limpo */}
       </SidebarContent>
 
       <SidebarFooter 
-        className="p-3 border-t border-gray-800" 
-        style={{ backgroundColor: '#111827', color: 'white' }}
+        className="p-3 border-t border-border bg-background text-foreground"
       >
-        <div className="space-y-2">
-          <SidebarMenuButton 
-            asChild
-            className="h-12 rounded-xl hover:bg-gray-800/50 justify-start text-gray-300 hover:text-white"
-          >
-            <Link href="/support" className="flex items-center gap-3 px-3">
-              <Headphones className="h-5 w-5" />
-              <span className="text-base">Suporte</span>
-            </Link>
-          </SidebarMenuButton>
-          
-          <div className="flex items-center gap-3 px-3 py-2">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 px-2 py-2 group-data-[collapsible=icon]:justify-center">
             <Avatar className="h-10 w-10">
-              <AvatarFallback className="bg-purple-500/20 text-purple-400">
+              <AvatarFallback className="bg-purple-100 text-purple-700 font-medium">
                 {session?.user?.name?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
-              <p className="text-sm font-medium truncate text-white">
+            <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+              <p className="text-sm font-medium truncate">
                 {session?.user?.name || 'Usuário'}
               </p>
-              <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
+              <Badge variant="outline" className="text-xs">
                 {userPlan}
               </Badge>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => signOut()}
-              className="h-8 w-8 rounded-lg hover:bg-red-500/10 hover:text-red-400 text-gray-400"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="ml-auto group-data-[collapsible=icon]:ml-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => signOut()}
+                className="h-8 w-8 rounded-lg hover:bg-muted"
+                title="Sair"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </SidebarFooter>

@@ -5,7 +5,8 @@ async function run() {
   const EMAIL = process.env.TEST_EMAIL || 'alexandretmoraes1@gmail.com'
   const PASSWORD = process.env.TEST_PASSWORD || 'Y*mare2025'
 
-  const browser = await chromium.launch({ headless: true })
+  const headless = !(process.env.HEADFUL === '1' || process.env.HEADLESS === 'false')
+  const browser = await chromium.launch({ headless })
   const ctx = await browser.newContext()
   const page = await ctx.newPage()
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useSession } from "next-auth/react"
 import TemplateSelector from "./template-selector"
+import { Paperclip, Globe, Brain, FileText, Send } from "lucide-react"
 
 interface Message {
   id: string
@@ -24,6 +25,7 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [showTemplates, setShowTemplates] = useState(false)
+  const [selectedModel, setSelectedModel] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { data: session } = useSession()
 
@@ -34,6 +36,14 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Load selected model from localStorage for display and API usage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('selectedModel')
+      setSelectedModel(saved)
+    } catch {}
+  }, [])
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return
@@ -51,42 +61,93 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
     setError("")
 
     try {
+      // Progressive streaming via text/event-stream
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
         body: JSON.stringify({
           messages: [...messages, userMessage].map(msg => ({
             role: msg.role,
             content: msg.content
           })),
-          model: "gpt-3.5-turbo",
-          conversationId
+          model: selectedModel || "gpt-3.5-turbo",
+          stream: true,
+          conversationId,
         }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Erro ao enviar mensagem")
+      if (!response.ok || !response.body) {
+        // Fallback: tentar non-stream JSON para obter a resposta padrão
+        const fallback = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            messages: [...messages, userMessage].map(msg => ({ role: msg.role, content: msg.content })),
+            model: selectedModel || "gpt-3.5-turbo",
+            stream: false,
+            conversationId,
+          }),
+        })
+        if (!fallback.ok) {
+          const errorData = await fallback.json().catch(() => ({}))
+          throw new Error(errorData?.message || "Erro ao enviar mensagem")
+        }
+        const data = await fallback.json()
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data?.choices?.[0]?.message?.content ?? data?.message ?? '',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, assistantMessage])
+      } else {
+        // SSE parsing
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        // placeholder assistant message to progressively fill
+        const assistantId = (Date.now() + 1).toString()
+        setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: "", timestamp: new Date() }])
+
+        const appendDelta = (delta: string) => {
+          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: (m.content || "") + delta } : m))
+        }
+
+        // read chunks
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          // split by double newline, standard SSE frame boundary
+          const parts = buffer.split("\n\n")
+          buffer = parts.pop() || ""
+          for (const part of parts) {
+            const line = part.trim()
+            if (!line) continue
+            // each event may contain multiple lines starting with data:
+            const dataLines = line.split("\n").filter(l => l.startsWith("data:"))
+            for (const dl of dataLines) {
+              const payload = dl.replace(/^data:\s*/, "")
+              if (payload === "[DONE]") {
+                // stream finished
+                break
+              }
+              try {
+                const json = JSON.parse(payload)
+                if (json?.delta) appendDelta(String(json.delta))
+                if (json?.error) {
+                  throw new Error(String(json.error))
+                }
+              } catch (e) {
+                // If not JSON, treat as plain delta
+                if (payload && payload !== "[DONE]") appendDelta(payload)
+              }
+            }
+          }
+        }
       }
-
-      const data = await response.json()
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.message,
-        timestamp: new Date()
-      }
-
-      setMessages(prev => [...prev, assistantMessage])
-
-      // Se é uma nova conversa, notificar o pai
-      if (!conversationId && data.conversationId && onNewConversation) {
-        onNewConversation(data.conversationId)
-      }
-
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error)
       setError(error instanceof Error ? error.message : "Erro ao enviar mensagem")
@@ -109,6 +170,15 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header sutil do chat */}
+      <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between bg-card/60">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">Chat com IA</span>
+          {selectedModel && (
+            <span className="text-xs text-muted-foreground">• modelo: {selectedModel}</span>
+          )}
+        </div>
+      </div>
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
@@ -122,7 +192,7 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                className={`max-w-[80%] rounded-xl px-4 py-2 shadow-sm ${
                   message.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted text-foreground'
@@ -138,11 +208,11 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
         )}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-4 py-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-foreground rounded-full animate-pulse"></div>
-                <div className="w-2 h-2 bg-foreground rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-foreground rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+            <div className="bg-muted rounded-full px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-1 opacity-80">
+                <span className="w-1.5 h-1.5 bg-foreground/70 rounded-full animate-pulse"></span>
+                <span className="w-1.5 h-1.5 bg-foreground/70 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></span>
+                <span className="w-1.5 h-1.5 bg-foreground/70 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></span>
               </div>
             </div>
           </div>
@@ -159,20 +229,31 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
 
       {/* Input Area */}
       <div className="border-t border-border p-4">
-        <div className="flex items-center space-x-2 mb-2">
-          <span className="text-sm text-muted-foreground">Pergunte para Kyroia</span>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+        <div className="flex items-center gap-2 mb-2 text-muted-foreground">
+          <span className="text-sm">Pergunte para Kyroia</span>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowTemplates(true)}
+            className="gap-2"
           >
-            📝 Templates
+            <FileText className="h-4 w-4" />
+            Templates
           </Button>
-          <Button variant="ghost" size="sm" disabled>📎 Adicionar</Button>
-          <Button variant="ghost" size="sm" disabled>🔍 Pesquisa na web</Button>
-          <Button variant="ghost" size="sm" disabled>🧠 Conhecimento</Button>
+          <Button variant="ghost" size="sm" disabled className="gap-2">
+            <Paperclip className="h-4 w-4" />
+            Adicionar
+          </Button>
+          <Button variant="ghost" size="sm" disabled className="gap-2">
+            <Globe className="h-4 w-4" />
+            Pesquisa na web
+          </Button>
+          <Button variant="ghost" size="sm" disabled className="gap-2">
+            <Brain className="h-4 w-4" />
+            Conhecimento
+          </Button>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -181,15 +262,17 @@ export default function ChatInterface({ conversationId, onNewConversation }: Cha
             disabled={loading}
             className="flex-1"
           />
-          <Button 
-            onClick={sendMessage} 
+          <Button
+            onClick={sendMessage}
             disabled={loading || !input.trim()}
+            className="gap-2"
           >
-            {loading ? "..." : "Enviar"}
+            <Send className="h-4 w-4" />
+            Enviar
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
-          Pressione Enter para enviar, Shift+Enter para nova linha
+          Enter envia • Shift+Enter quebra linha
         </p>
       </div>
 

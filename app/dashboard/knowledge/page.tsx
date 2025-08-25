@@ -257,14 +257,14 @@ export default function KnowledgePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Base de Conhecimento</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-xl font-semibold">Base de Conhecimento</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
             Gerencie documentos e informações para a IA usar como contexto
           </p>
         </div>
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="h-9 rounded-lg">
               <Plus className="mr-2 h-4 w-4" />
               Adicionar
             </Button>
@@ -385,10 +385,10 @@ export default function KnowledgePage() {
                 )}
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
+                <Button type="button" variant="outline" className="h-9 rounded-lg" onClick={() => setShowDialog(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isCreating}>
+                <Button type="submit" className="h-9 rounded-lg gradient-primary text-white" disabled={isCreating}>
                   {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Adicionar
                 </Button>
@@ -406,11 +406,11 @@ export default function KnowledgePage() {
             placeholder="Buscar por nome ou descrição..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-9 rounded-lg"
           />
         </div>
         <Select value={selectedType} onValueChange={setSelectedType}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px] h-9 rounded-lg">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -427,8 +427,8 @@ export default function KnowledgePage() {
       {isLoading ? (
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
+            <Card key={i} className="border border-border/60 rounded-2xl shadow-soft">
+              <CardContent className="p-4">
                 <div className="space-y-3">
                   <Skeleton className="h-6 w-1/3" />
                   <Skeleton className="h-4 w-2/3" />
@@ -439,8 +439,8 @@ export default function KnowledgePage() {
           ))}
         </div>
       ) : filteredKnowledge.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
+        <Card className="border border-border/60 rounded-2xl shadow-soft">
+          <CardContent className="p-10 text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <FileText className="h-6 w-6 text-muted-foreground" />
             </div>
@@ -450,7 +450,7 @@ export default function KnowledgePage() {
                 'Base de conhecimento vazia'
               }
             </h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               {searchQuery || selectedType !== 'all' ? 
                 'Tente ajustar os filtros de busca' :
                 'Adicione documentos para a IA usar como referência'
@@ -459,29 +459,29 @@ export default function KnowledgePage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-2xl border border-border/60 bg-card shadow-soft">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Tamanho</TableHead>
-                <TableHead>Criado em</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+              <TableRow className="h-11">
+                <TableHead className="font-semibold text-foreground/90">Nome</TableHead>
+                <TableHead className="font-semibold text-foreground/90">Tipo</TableHead>
+                <TableHead className="font-semibold text-foreground/90">Tamanho</TableHead>
+                <TableHead className="font-semibold text-foreground/90">Criado em</TableHead>
+                <TableHead className="text-right font-semibold text-foreground/90">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredKnowledge.map((item) => {
                 const Icon = typeIcons[item.type]
                 return (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} className="h-11 odd:bg-background/60 hover:bg-background/70 border-b border-border/60 last:border-b-0">
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                          <Icon className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-9 w-9 rounded-md bg-background/60 border border-border/60 flex items-center justify-center">
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
                         </div>
                         <div>
-                          <div className="font-medium">{item.name}</div>
+                          <div className="font-medium text-foreground">{item.name}</div>
                           {item.description && (
                             <div className="text-sm text-muted-foreground">
                               {item.description}
@@ -491,7 +491,7 @@ export default function KnowledgePage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="rounded-md bg-background/60">
                         {typeLabels[item.type]}
                       </Badge>
                     </TableCell>
@@ -502,21 +502,11 @@ export default function KnowledgePage() {
                       {new Date(item.createdAt).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handlePreview(item.id)}
-                          title="Visualizar conteúdo"
-                        >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md" onClick={() => handlePreview(item.id)} title="Visualizar conteúdo">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(item.id)}
-                          title="Remover"
-                        >
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md" onClick={() => handleDelete(item.id)} title="Remover">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

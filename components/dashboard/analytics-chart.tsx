@@ -46,7 +46,7 @@ export function AnalyticsChart({ data }: AnalyticsChartProps) {
     <div className="space-y-6">
       {/* Overview Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="rounded-2xl border border-border/60 bg-card shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Mensagens</CardTitle>
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
@@ -59,7 +59,7 @@ export function AnalyticsChart({ data }: AnalyticsChartProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border border-border/60 bg-card shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Conversas Criadas</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
@@ -72,7 +72,7 @@ export function AnalyticsChart({ data }: AnalyticsChartProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border border-border/60 bg-card shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tokens Utilizados</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -85,7 +85,7 @@ export function AnalyticsChart({ data }: AnalyticsChartProps) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border border-border/60 bg-card shadow-soft">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Custo Total</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -102,7 +102,7 @@ export function AnalyticsChart({ data }: AnalyticsChartProps) {
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Messages Chart */}
-        <Card>
+        <Card className="rounded-2xl border border-border/60 bg-card shadow-soft">
           <CardHeader>
             <CardTitle>Uso Diário - Mensagens</CardTitle>
             <CardDescription>Mensagens enviadas por dia</CardDescription>
@@ -133,7 +133,7 @@ export function AnalyticsChart({ data }: AnalyticsChartProps) {
         </Card>
 
         {/* Model Usage */}
-        <Card>
+        <Card className="rounded-2xl border border-border/60 bg-card shadow-soft">
           <CardHeader>
             <CardTitle>Uso por Modelo</CardTitle>
             <CardDescription>Distribuição de uso dos modelos de IA</CardDescription>
@@ -161,7 +161,7 @@ export function AnalyticsChart({ data }: AnalyticsChartProps) {
       </div>
 
       {/* Recent Activity */}
-      <Card>
+      <Card className="rounded-2xl border border-border/60 bg-card shadow-soft">
         <CardHeader>
           <CardTitle>Atividade Recente</CardTitle>
           <CardDescription>Suas conversas mais recentes</CardDescription>

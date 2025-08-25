@@ -30,6 +30,13 @@ describe('AIService', () => {
     
     mockOpenAIProvider.getAvailableModels.mockReturnValue(openAIModels);
     mockOpenRouterProvider.getAvailableModels.mockReturnValue(openRouterModels);
+
+    // Injetar providers mockados no singleton para que o AIService use estas instâncias
+    // @ts-ignore acessando método de teste
+    aiService['__setProvidersForTest']({
+      openai: mockOpenAIProvider,
+      openrouter: mockOpenRouterProvider,
+    });
   });
 
   describe('Provider Management', () => {

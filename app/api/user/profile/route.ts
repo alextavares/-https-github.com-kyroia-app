@@ -6,8 +6,7 @@ import { setNoStore } from '@/lib/cache/headers'
 import { z } from 'zod'
 import { validateWith } from '@/lib/validation/zod-helpers'
 
-export async function GET() {
-  return handleRoute(async () => {
+export const GET = handleRoute(async () => {
     const auth = await requireAuth()
     if (!auth.ok) {
       const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
@@ -35,14 +34,13 @@ export async function GET() {
     setNoStore(res)
     return res
   })
-}
+
 
 const patchSchema = z.object({
   name: z.string().min(2).max(120),
 })
 
-export async function PATCH(request: Request) {
-  return handleRoute(async () => {
+export const PATCH = handleRoute(async (request: Request) => {
     const auth = await requireAuth()
     if (!auth.ok) {
       const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
@@ -73,4 +71,3 @@ export async function PATCH(request: Request) {
     setNoStore(res)
     return res
   })
-}

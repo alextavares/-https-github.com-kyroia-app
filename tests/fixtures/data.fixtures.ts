@@ -1,3 +1,6 @@
+// Import mock users from auth fixtures (must be before usage to avoid init errors)
+import { mockUsers } from './auth.fixtures';
+
 // Mock data for various entities
 
 export const mockConversations = [
@@ -36,7 +39,8 @@ export const mockConversations = [
   },
 ];
 
-export const mockTemplates = [
+// Array form (legacy)
+export const mockTemplatesArray = [
   {
     id: '1',
     title: 'Email Profissional',
@@ -72,7 +76,45 @@ export const mockTemplates = [
   },
 ];
 
-export const mockKnowledgeBase = [
+// Object form expected by integration tests
+export const mockTemplatesObj = {
+  codeReview: {
+    id: 'tpl-code-review',
+    name: 'Code Review',
+    content: 'Please review the following code: {{code}}\nLanguage: {{language}}',
+    category: 'CODING',
+    variables: ['code', 'language'],
+    isPublic: false,
+    usageCount: 42,
+    userId: '2',
+  },
+  emailDraft: {
+    id: 'tpl-email-draft',
+    name: 'Email Draft',
+    content: 'Escreva um email profissional sobre: {{topic}}',
+    category: 'GENERAL',
+    variables: ['topic'],
+    isPublic: false,
+    usageCount: 10,
+    userId: '2',
+  },
+  public: {
+    id: 'tpl-public',
+    name: 'Public Template',
+    content: 'Conteúdo público',
+    category: 'GENERAL',
+    variables: [],
+    isPublic: true,
+    usageCount: 5,
+    userId: null,
+  },
+}
+
+// Re-export name used by tests
+export { mockTemplatesObj as mockTemplates }
+
+// Array form (legacy)
+export const mockKnowledgeBaseArray = [
   {
     id: '1',
     userId: '1',
@@ -100,6 +142,31 @@ export const mockKnowledgeBase = [
     updatedAt: new Date('2024-01-02'),
   },
 ];
+
+// Object form expected by integration tests
+export const mockKnowledgeBaseObj = {
+  document: {
+    id: 'kb-doc-1',
+    type: 'DOCUMENT',
+    title: 'API Documentation',
+    content: 'API details...'
+  },
+  webpage: {
+    id: 'kb-web-1',
+    type: 'WEBPAGE',
+    title: 'InnerAI Website',
+    url: 'https://innerai.com',
+  },
+  faq: {
+    id: 'kb-faq-1',
+    type: 'FAQ',
+    title: 'General FAQs',
+    faqs: [
+      { question: 'What is this?', answer: 'A test fixture.' },
+    ],
+  },
+}
+export { mockKnowledgeBaseObj as mockKnowledgeBase }
 
 export const mockUsageData = {
   today: {
@@ -185,8 +252,8 @@ export const mockNotifications = [
 export const mockDatabase = {
   users: mockUsers,
   conversations: mockConversations,
-  templates: mockTemplates,
-  knowledgeBase: mockKnowledgeBase,
+  templates: mockTemplatesArray,
+  knowledgeBase: mockKnowledgeBaseArray,
   
   async findUser(email: string) {
     return this.users.find(u => u.email === email);
@@ -220,6 +287,3 @@ export const mockDatabase = {
     return newConversation;
   },
 };
-
-// Import mock users from auth fixtures
-import { mockUsers } from './auth.fixtures';

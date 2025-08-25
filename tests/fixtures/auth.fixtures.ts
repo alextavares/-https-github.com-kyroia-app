@@ -37,6 +37,7 @@ export const mockUsers = {
   basic: mockUsersList[0],
   pro: mockUsersList[1],
   admin: mockUsersList[2],
+  enterprise: mockUsersList[2],
 };
 
 export const mockUsersArray = mockUsersList;
@@ -136,6 +137,17 @@ export const mockSessions = {
       role: mockUsersList[1].role,
       plan: mockUsersList[1].plan,
       image: mockUsersList[1].image,
+    },
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  enterprise: {
+    user: {
+      id: mockUsersList[2].id,
+      email: mockUsersList[2].email,
+      name: mockUsersList[2].name,
+      role: mockUsersList[2].role,
+      plan: mockUsersList[2].plan,
+      image: mockUsersList[2].image,
     },
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   },

@@ -66,6 +66,21 @@ simple-*.js
 .turbo/
 .swc/
 
+# Virtual envs
+.venv/
+
+# Local logs and PIDs
+logs*
+*.pid
+
+# Local temp artifacts
+.anim*
+.compare*.out
+.cookies*.txt
+
+# Screenshots (kept out of git; reports live elsewhere)
+screenshots/
+
 # IDE
 .vscode/
 .idea/

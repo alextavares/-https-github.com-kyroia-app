@@ -49,6 +49,10 @@ export class OpenRouterProvider implements AIProvider {
 
   // Mapa EXATO dos modelos do Kyroia original para OpenRouter
   private modelMap: Record<string, string> = {
+    // Aliases solicitados
+    'gpt-5-mini': 'openai/gpt-4o-mini',
+    'gpt-5': 'openai/gpt-4o',
+    'gpt-oss': 'meta-llama/llama-3.3-70b-instruct',
     // ===== MODELOS RÁPIDOS (Fast Models) =====
     'llama-4-scout': 'meta-llama/llama-3.2-3b-instruct', // Fallback temporário
     'deepseek-3.1': 'deepseek/deepseek-chat', // Fallback temporário

@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
+import { __setTestStripeInstance } from '@/lib/stripe'
 import crypto from 'crypto'
 import { mockUsers, mockSessions } from '../fixtures/auth.fixtures'
 import { mockPlans, mockStripeWebhookEvents, mockMercadoPagoWebhookEvents } from '../fixtures/payment.fixtures'
@@ -61,6 +62,8 @@ describe('Payment Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockStripe = new (Stripe as any)()
+    // Inject the instance so route handlers call exactly this mock
+    __setTestStripeInstance(mockStripe)
   })
 
   afterEach(() => {

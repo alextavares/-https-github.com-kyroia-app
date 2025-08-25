@@ -47,135 +47,61 @@ async function extractTextFromFile(content: string, mimeType: string): Promise<s
   }
 }
 
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const knowledgeBase = await prisma.knowledgeBase.findMany({
-      where: {
-        userId: user.id,
-        isActive: true
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      select: {
-        id: true,
-        title: true,
-        type: true,
-        createdAt: true,
-        updatedAt: true
-      }
-    })
-
-    return NextResponse.json({ knowledgeBase })
-  } catch (error) {
-    console.error('Error fetching knowledge base:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch knowledge base' },
-      { status: 500 }
-    )
+export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { searchParams } = new URL(request.url)
+  const type = searchParams.get('type')
+  const search = searchParams.get('search')
+
+  const where: any = { userId: session.user.id }
+  if (type) where.type = type
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { content: { contains: search, mode: 'insensitive' } },
+      { tags: { has: search } },
+    ]
+  }
+
+  const rows = await (prisma as any).knowledgeBase.findMany({ where, orderBy: { createdAt: 'desc' } })
+  return NextResponse.json(rows)
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const body = await request.json()
-    const validatedData = createKnowledgeSchema.parse(body)
-
-    // Check user's plan limits
-    const knowledgeCount = await prisma.knowledgeBase.count({
-      where: {
-        userId: user.id,
-        isActive: true
-      }
-    })
-
-    const limits = {
-      FREE: 5,
-      PRO: 50,
-      ENTERPRISE: -1 // unlimited
-    }
-
-    const limit = limits[user.planType as keyof typeof limits]
-    if (limit !== -1 && knowledgeCount >= limit) {
-      return NextResponse.json(
-        { error: `Limite de documentos atingido (${limit} documentos para plano ${user.planType})` },
-        { status: 403 }
-      )
-    }
-
-    // Extract text content from file if it's a document
-    let processedContent = validatedData.content
-    if (validatedData.type === 'DOCUMENT' && validatedData.mimeType) {
-      processedContent = await extractTextFromFile(validatedData.content, validatedData.mimeType)
-    }
-
-    // Normalizar campos opcionais evitando 'any'
-    const metadataStr: string | null =
-      typeof validatedData.metadata === 'object' && validatedData.metadata !== null
-        ? JSON.stringify(validatedData.metadata)
-        : (typeof validatedData.metadata === 'string' ? validatedData.metadata : null)
-
-    const mimeTypeStr: string | null =
-      typeof (validatedData as { mimeType?: unknown }).mimeType === 'string'
-        ? (validatedData as { mimeType?: string }).mimeType!
-        : null
-
-    const originalNameStr: string | null =
-      typeof (validatedData as { originalName?: unknown }).originalName === 'string'
-        ? (validatedData as { originalName?: string }).originalName!
-        : null
-
-    const knowledge = await prisma.knowledgeBase.create({
-      data: {
-        title: validatedData.name,
-        content: processedContent,
-        userId: user.id,
-        type: validatedData.type,
-        ...(metadataStr !== null ? { metadata: metadataStr } : {}),
-        ...(mimeTypeStr !== null ? { mimeType: mimeTypeStr } : {}),
-        ...(originalNameStr !== null ? { originalName: originalNameStr } : {})
-      }
-    })
-
-    return NextResponse.json({ knowledge }, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid data', details: error.errors },
-        { status: 400 }
-      )
-    }
-
-    console.error('Error creating knowledge:', error)
-    return NextResponse.json(
-      { error: 'Failed to create knowledge' },
-      { status: 500 }
-    )
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const user = await (prisma.user.findUnique as any)({ where: { id: session.user.id } })
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  const body = await request.json()
+
+  // Enforce limits (FREE: 10)
+  const count = await (prisma as any).knowledgeBase.count({ where: { userId: session.user.id } })
+  const isFree = (user.plan || user.planType || 'FREE') === 'FREE'
+  if (isFree && count >= 10) {
+    return NextResponse.json({ error: 'Limite de itens na base de conhecimento atingido' }, { status: 403 })
+  }
+
+  if (body.type === 'DOCUMENT') {
+    const content = body.content ?? body.fileData ?? ''
+    const created = await (prisma as any).knowledgeBase.create({ data: { ...body, content, userId: session.user.id } })
+    return NextResponse.json(created, { status: 201 })
+  }
+  if (body.type === 'WEBPAGE') {
+    const created = await (prisma as any).knowledgeBase.create({ data: { ...body, userId: session.user.id } })
+    return NextResponse.json(created, { status: 201 })
+  }
+  if (body.type === 'FAQ') {
+    const created = await (prisma as any).knowledgeBase.create({ data: { ...body, userId: session.user.id } })
+    return NextResponse.json(created, { status: 201 })
+  }
+  const created = await (prisma as any).knowledgeBase.create({ data: { ...body, userId: session.user.id } })
+  return NextResponse.json(created, { status: 201 })
 }

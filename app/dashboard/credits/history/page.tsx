@@ -124,87 +124,87 @@ export default async function CreditHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-800">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between p-4 border-b border-border/60">
+        <div className="flex items-center gap-3">
           <Link href="/dashboard">
-            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-              <ArrowLeft className="h-6 w-6" />
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-semibold">Histórico de Créditos</h1>
+          <h1 className="text-xl font-semibold">Histórico de Créditos</h1>
         </div>
         <Link href="/dashboard/credits/purchase">
-          <Button className="bg-white text-black hover:bg-gray-100">
+          <Button className="gradient-primary text-white rounded-lg h-9">
             <Plus className="h-4 w-4 mr-2" />
             Comprar Créditos
           </Button>
         </Link>
       </div>
 
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card className="border border-border/60 bg-card rounded-2xl shadow-soft">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Saldo Atual</p>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-muted-foreground text-xs">Saldo Atual</p>
+                  <p className="text-xl font-bold text-foreground">
                     {creditBalance.toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-5 w-5 text-white" />
+                <div className="w-9 h-9 bg-secondary rounded-md flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-white" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="p-6">
+          <Card className="border border-border/60 bg-card rounded-2xl shadow-soft">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Comprados este mês</p>
-                  <p className="text-2xl font-bold text-green-400">
+                  <p className="text-muted-foreground text-xs">Comprados este mês</p>
+                  <p className="text-xl font-bold text-foreground">
                     {monthlyStats.totalPurchased.toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                  <Plus className="h-5 w-5 text-white" />
+                <div className="w-9 h-9 bg-accent rounded-md flex items-center justify-center">
+                  <Plus className="h-4 w-4 text-white" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="p-6">
+          <Card className="border border-border/60 bg-card rounded-2xl shadow-soft">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Gastos este mês</p>
-                  <p className="text-2xl font-bold text-red-400">
+                  <p className="text-muted-foreground text-xs">Gastos este mês</p>
+                  <p className="text-xl font-bold text-foreground">
                     {monthlyStats.totalSpent.toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                  <Minus className="h-5 w-5 text-white" />
+                <div className="w-9 h-9 bg-red-500 rounded-md flex items-center justify-center">
+                  <Minus className="h-4 w-4 text-white" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="p-6">
+          <Card className="border border-border/60 bg-card rounded-2xl shadow-soft">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Total investido</p>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-muted-foreground text-xs">Total investido</p>
+                  <p className="text-xl font-bold text-foreground">
                     R$ {monthlyStats.purchaseAmount.toFixed(2).replace('.', ',')}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <TrendingDown className="h-5 w-5 text-white" />
+                <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
+                  <TrendingDown className="h-4 w-4 text-white" />
                 </div>
               </div>
             </CardContent>
@@ -217,10 +217,10 @@ export default async function CreditHistoryPage() {
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <div className="flex flex-col sm:flex-row gap-4">
                 <Select defaultValue="all">
-                  <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700">
+                  <SelectTrigger className="w-[180px] bg-background/60 border border-border/60 rounded-lg h-9">
                     <SelectValue placeholder="Filtrar por tipo" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectContent className="bg-card border border-border/60">
                     <SelectItem value="all">Todas as transações</SelectItem>
                     <SelectItem value="purchase">Apenas compras</SelectItem>
                     <SelectItem value="usage">Apenas gastos</SelectItem>
@@ -228,10 +228,10 @@ export default async function CreditHistoryPage() {
                 </Select>
 
                 <Select defaultValue="all-time">
-                  <SelectTrigger className="w-[180px] bg-gray-800 border-gray-700">
+                  <SelectTrigger className="w-[180px] bg-background/60 border border-border/60 rounded-lg h-9">
                     <SelectValue placeholder="Período" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectContent className="bg-card border border-border/60">
                     <SelectItem value="all-time">Todo o período</SelectItem>
                     <SelectItem value="this-month">Este mês</SelectItem>
                     <SelectItem value="last-month">Mês passado</SelectItem>
@@ -240,7 +240,7 @@ export default async function CreditHistoryPage() {
                 </Select>
               </div>
 
-              <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800">
+              <Button variant="outline" className="border border-border/60 text-muted-foreground hover:bg-background/60 rounded-lg h-9">
                 <Download className="h-4 w-4 mr-2" />
                 Exportar Relatório
               </Button>
@@ -250,14 +250,14 @@ export default async function CreditHistoryPage() {
 
         {/* Transactions */}
         <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-900">
-            <TabsTrigger value="all" className="data-[state=active]:bg-gray-700">
+          <TabsList className="grid w-full grid-cols-3 bg-card rounded-xl">
+            <TabsTrigger value="all" className="data-[state=active]:bg-background/80 data-[state=active]:text-foreground">
               Todas ({mockTransactions.length})
             </TabsTrigger>
-            <TabsTrigger value="purchases" className="data-[state=active]:bg-gray-700">
+            <TabsTrigger value="purchases" className="data-[state=active]:bg-background/80 data-[state=active]:text-foreground">
               Compras ({mockTransactions.filter(t => t.type === 'purchase').length})
             </TabsTrigger>
-            <TabsTrigger value="usage" className="data-[state=active]:bg-gray-700">
+            <TabsTrigger value="usage" className="data-[state=active]:bg-background/80 data-[state=active]:text-foreground">
               Gastos ({mockTransactions.filter(t => t.type === 'usage').length})
             </TabsTrigger>
           </TabsList>
@@ -268,19 +268,19 @@ export default async function CreditHistoryPage() {
               const colorClass = getTransactionColor(transaction.type)
               
               return (
-                <Card key={transaction.id} className="bg-gray-900 border-gray-700 hover:border-gray-600 transition-colors">
-                  <CardContent className="p-6">
+                <Card key={transaction.id} className="bg-card border border-border/60 rounded-2xl hover:border-border transition-colors">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          transaction.type === 'purchase' ? 'bg-green-600' : 'bg-red-600'
+                        <div className={`w-9 h-9 rounded-md flex items-center justify-center ${
+                          transaction.type === 'purchase' ? 'bg-accent' : 'bg-red-500'
                         }`}>
                           <Icon className="h-5 w-5 text-white" />
                         </div>
                         
                         <div>
-                          <div className="text-white font-medium">{transaction.description}</div>
-                          <div className="text-gray-400 text-sm">
+                          <div className="text-foreground font-medium">{transaction.description}</div>
+                          <div className="text-muted-foreground text-sm">
                             {formatDate(transaction.date)}
                             {transaction.method && ` • ${transaction.method}`}
                             {transaction.model && ` • ${transaction.model}`}
@@ -289,11 +289,11 @@ export default async function CreditHistoryPage() {
                       </div>
 
                       <div className="text-right">
-                        <div className={`text-lg font-semibold ${colorClass}`}>
+                        <div className={`text-base font-semibold ${colorClass}`}>
                           {transaction.type === 'purchase' ? '+' : ''}{transaction.amount.toLocaleString('pt-BR')} créditos
                         </div>
                         {transaction.price && (
-                          <div className="text-gray-400 text-sm">
+                          <div className="text-muted-foreground text-sm">
                             R$ {transaction.price.toFixed(2).replace('.', ',')}
                           </div>
                         )}
@@ -315,31 +315,31 @@ export default async function CreditHistoryPage() {
               const colorClass = getTransactionColor(transaction.type)
               
               return (
-                <Card key={transaction.id} className="bg-gray-900 border-gray-700">
-                  <CardContent className="p-6">
+                <Card key={transaction.id} className="bg-card border border-border/60 rounded-2xl">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                          <Icon className="h-5 w-5 text-white" />
+                        <div className="w-9 h-9 bg-accent rounded-md flex items-center justify-center">
+                          <Icon className="h-4 w-4 text-white" />
                         </div>
                         
                         <div>
-                          <div className="text-white font-medium">{transaction.description}</div>
-                          <div className="text-gray-400 text-sm">
-                            {formatDate(transaction.date)} • {transaction.method}
+                          <div className="text-foreground font-medium">{transaction.description}</div>
+                          <div className="text-muted-foreground text-sm">
+                            {formatDate(transaction.date)}{transaction.method ? ` • ${transaction.method}` : ''}
                           </div>
                         </div>
                       </div>
 
                       <div className="text-right">
-                        <div className={`text-lg font-semibold ${colorClass}`}>
+                        <div className={`text-base font-semibold ${colorClass}`}>
                           +{transaction.amount.toLocaleString('pt-BR')} créditos
                         </div>
-                        <div className="text-gray-400 text-sm">
-                          R$ {transaction.price?.toFixed(2).replace('.', ',')}
+                        <div className="text-muted-foreground text-sm">
+                          {transaction.price ? `R$ ${transaction.price.toFixed(2).replace('.', ',')}` : ''}
                         </div>
-                        <Badge className="bg-green-600 text-white text-xs mt-1">
-                          Concluído
+                        <Badge className="bg-accent text-white text-xs mt-1">
+                          {transaction.status === 'completed' ? 'Concluído' : 'Pendente'}
                         </Badge>
                       </div>
                     </div>
@@ -355,28 +355,28 @@ export default async function CreditHistoryPage() {
               const colorClass = getTransactionColor(transaction.type)
               
               return (
-                <Card key={transaction.id} className="bg-gray-900 border-gray-700">
-                  <CardContent className="p-6">
+                <Card key={transaction.id} className="bg-card border border-border/60 rounded-2xl">
+                  <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                          <Icon className="h-5 w-5 text-white" />
+                        <div className="w-9 h-9 bg-red-500 rounded-md flex items-center justify-center">
+                          <Icon className="h-4 w-4 text-white" />
                         </div>
                         
                         <div>
-                          <div className="text-white font-medium">{transaction.description}</div>
-                          <div className="text-gray-400 text-sm">
-                            {formatDate(transaction.date)} • {transaction.model}
+                          <div className="text-foreground font-medium">{transaction.description}</div>
+                          <div className="text-muted-foreground text-sm">
+                            {formatDate(transaction.date)}{transaction.model ? ` • ${transaction.model}` : ''}
                           </div>
                         </div>
                       </div>
 
                       <div className="text-right">
-                        <div className={`text-lg font-semibold ${colorClass}`}>
+                        <div className={`text-base font-semibold ${colorClass}`}>
                           {transaction.amount.toLocaleString('pt-BR')} créditos
                         </div>
-                        <Badge className="bg-red-600 text-white text-xs mt-1">
-                          Concluído
+                        <Badge className="bg-red-500 text-white text-xs mt-1">
+                          {transaction.status === 'completed' ? 'Concluído' : 'Pendente'}
                         </Badge>
                       </div>
                     </div>
@@ -389,15 +389,15 @@ export default async function CreditHistoryPage() {
 
         {/* Empty State */}
         {mockTransactions.length === 0 && (
-          <Card className="bg-gray-900 border-gray-700">
-            <CardContent className="p-12 text-center">
-              <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Nenhuma transação encontrada</h3>
-              <p className="text-gray-400 mb-6">
+          <Card className="bg-card border border-border/60 rounded-2xl">
+            <CardContent className="p-10 text-center">
+              <FileText className="h-14 w-14 text-muted-foreground mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">Nenhuma transação encontrada</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
                 Você ainda não possui histórico de transações de créditos.
               </p>
               <Link href="/dashboard/credits/purchase">
-                <Button className="bg-white text-black hover:bg-gray-100">
+                <Button className="gradient-primary text-white rounded-lg h-9">
                   <Plus className="h-4 w-4 mr-2" />
                   Comprar Primeiros Créditos
                 </Button>

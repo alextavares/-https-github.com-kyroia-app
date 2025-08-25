@@ -52,16 +52,21 @@ export const GET = handleRoute(async () => {
   const balance = await CreditsService.getUserBalance(user.id)
   const isLowBalance = balance < planLimits.recommendedMinCredits
 
-  // Pacotes disponíveis para recomendação
-  // Nota: modelo CreditPackage não possui campo "active" no schema atual
-  const packages = await prisma.creditPackage.findMany({
-    orderBy: { credits: 'asc' },
-    select: { id: true, name: true, credits: true, price: true },
-    take: 5,
-  })
+  // Pacotes disponíveis para recomendação (pode não existir no SQLite local)
+  // Fallback seguro quando a tabela não existe em dev
+  let packages: Array<{ id: string; name: string; credits: number; price: number }> = []
+  try {
+    packages = await prisma.creditPackage.findMany({
+      orderBy: { credits: 'asc' },
+      select: { id: true, name: true, credits: true, price: true },
+      take: 5,
+    })
+  } catch (e) {
+    packages = []
+  }
 
   // Estratégia simples de recomendação baseada no saldo
-  const recommendations = isLowBalance
+  const recommendations = isLowBalance && packages.length > 0
     ? packages.slice(0, 3).map((p) => ({
         packageId: p.id,
         name: p.name,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -28,12 +28,20 @@ interface CreateTemplateDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
+  initialContent?: string
+  initialName?: string
+  initialCategory?: string
+  initialTags?: string[]
 }
 
 export function CreateTemplateDialog({ 
   open, 
   onOpenChange, 
-  onSuccess 
+  onSuccess,
+  initialContent,
+  initialName,
+  initialCategory,
+  initialTags,
 }: CreateTemplateDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -47,6 +55,21 @@ export function CreateTemplateDialog({
     isPublic: false,
     isFeatured: false,
   })
+
+  // Prefill when opened
+  // Avoid overriding while user is editing: only set on open edge and when fields are empty
+  // If explicit initial fields provided, prioritize them
+  useEffect(() => {
+    if (!open) return
+    setFormData(prev => ({
+      ...prev,
+      name: (initialName && initialName.trim()) ? initialName : (prev.name || `Template ${new Date().toLocaleString()}`),
+      category: (initialCategory && initialCategory.trim()) ? initialCategory : (prev.category || ''),
+      templateContent: (initialContent && initialContent.trim()) ? initialContent : prev.templateContent,
+      tags: Array.isArray(initialTags) && initialTags.length > 0 ? initialTags.join(', ') : prev.tags,
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialContent, initialName, initialCategory, initialTags])
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.category || !formData.templateContent) {

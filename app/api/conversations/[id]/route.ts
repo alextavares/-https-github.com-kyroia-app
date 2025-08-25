@@ -12,6 +12,8 @@ type RouteParams = { params: { id: string } };
 const patchSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   isArchived: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  isFavorite: z.boolean().optional(),
 });
 
 // GET /api/conversations/[id]

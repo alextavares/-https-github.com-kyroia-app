@@ -1,18 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import { NextRequest } from 'next/server'
-import { POST } from '@/app/api/chat/route'
-import { aiService } from '@/lib/ai/ai-service'
 
 // Mock das dependências
 jest.mock('@/lib/auth')
 jest.mock('@/lib/prisma')
 jest.mock('@/lib/ai/ai-service')
 
-const mockAiService = aiService as jest.Mocked<typeof aiService>
+let mockAiService: any
 
 describe('Chat API Robustness Tests', () => {
   beforeEach(() => {
+    jest.resetModules()
     jest.clearAllMocks()
+    mockAiService = require('@/lib/ai/ai-service').aiService
     
     // Mock da sessão válida
     const mockGetServerSession = require('@/lib/auth').getServerSession
@@ -61,6 +61,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -86,6 +87,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -110,6 +112,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -128,6 +131,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -144,6 +148,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -163,6 +168,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -195,6 +201,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -222,6 +229,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -244,6 +252,7 @@ describe('Chat API Robustness Tests', () => {
         })
       })
 
+      const { POST } = require('@/app/api/chat/route')
       const response = await POST(request)
       const data = await response.json()
 
@@ -269,7 +278,7 @@ describe('AI Service Fallback Tests', () => {
     })
 
     try {
-      await aiService.generateResponse(
+      await require('@/lib/ai/ai-service').aiService.generateResponse(
         [{ role: 'user', content: 'Test' }],
         'gpt-3.5-turbo'
       )

@@ -4,8 +4,7 @@ import { requireAuth } from '@/lib/auth/guards'
 import { setNoStore } from '@/lib/cache/headers'
 import { handleRoute, DomainError } from '@/lib/http/errors'
 
-export async function GET() {
-  return handleRoute(async () => {
+export const GET = handleRoute(async () => {
     const auth = await requireAuth()
     if (!auth.ok) {
       const res = NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
@@ -131,4 +130,3 @@ export async function GET() {
     setNoStore(res)
     return res
   })
-}

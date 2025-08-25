@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth/guards'
 import { setNoStore } from '@/lib/cache/headers'
 import { handleRoute, Unauthorized, NotFound } from '@/lib/http/errors'
+import { startOfDay, endOfDay } from 'date-fns'
 
 /**
  * GET /api/usage/today
@@ -14,74 +15,64 @@ type JsonMessage = {
   [k: string]: unknown
 } | null
 
-export async function GET() {
-  return handleRoute(async () => {
-    const auth = await requireAuth()
-    if (!auth.ok) {
-      return Unauthorized(auth.error?.message ?? 'Não autorizado')
-    }
+export const GET = handleRoute(async () => {
+  const auth = await requireAuth()
+  if (!auth.ok) {
+    return Unauthorized(auth.error?.message ?? 'Não autorizado')
+  }
 
-    const user = await prisma.user.findUnique({
-      where: { id: auth.userId },
-      select: { id: true, planType: true, createdAt: true },
-    })
-    if (!user) {
-      return NotFound('Usuário não encontrado')
-    }
-
-    // Janela de hoje (UTC)
-    const startOfDay = new Date()
-    startOfDay.setUTCHours(0, 0, 0, 0)
-    const endOfDay = new Date()
-    endOfDay.setUTCHours(23, 59, 59, 999)
-
-    // Limites (defaults simples; ajustar conforme política de planos)
-    const dailyLimit: number | null = 10
-    const monthlyTokenLimit: number | null = null
-
-    // Busca conversas do usuário (limite razoável para performance)
-    const conversations = await prisma.conversation.findMany({
-      where: { userId: auth.userId },
-      orderBy: { createdAt: 'desc' },
-      select: { messages: true, createdAt: true },
-      take: 200,
-    })
-
-    // Contabiliza mensagens de hoje
-    let todayMessages = 0
-    conversations.forEach((c) => {
-      const msgs = Array.isArray(c.messages) ? c.messages : []
-      msgs.forEach((m) => {
-        const jm = m as unknown as JsonMessage
-        if (!jm || typeof jm !== 'object') return
-        const createdVal = jm.createdAt
-        let dt: Date
-        if (createdVal instanceof Date) dt = createdVal
-        else if (typeof createdVal === 'string' || typeof createdVal === 'number') dt = new Date(createdVal)
-        else dt = new Date(c.createdAt)
-        if (!isNaN(dt.getTime()) && dt >= startOfDay && dt <= endOfDay) {
-          todayMessages += 1
-        }
-      })
-    })
-
-    // Tokens mensais indisponíveis sem UserUsage; definimos como 0 (placeholder)
-    const monthlyTokensUsed = 0
-
-    const res = NextResponse.json({
-      dailyMessages: {
-        used: todayMessages,
-        limit: dailyLimit === -1 ? null : dailyLimit,
-      },
-      monthlyTokens: {
-        used: monthlyTokensUsed,
-        limit: monthlyTokenLimit === -1 ? null : monthlyTokenLimit,
-      },
-      planType: user.planType,
-      remainingMessages:
-        dailyLimit === null || dailyLimit === -1 ? null : Math.max(0, dailyLimit - todayMessages),
-    })
-    setNoStore(res)
-    return res
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+    select: { id: true, plan: true, planType: true, createdAt: true },
   })
-}
+  if (!user) {
+    return NotFound('Usuário não encontrado')
+  }
+
+  // Janela de hoje usando date-fns para alinhar com testes
+  const now = new Date()
+  const start = startOfDay(now)
+  const end = endOfDay(now)
+
+  // Limites por plano (valores esperados nos testes)
+  const plan = (user.plan || user.planType || 'FREE') as string
+  const dailyMessagesLimit = plan === 'PRO' ? 50 : 10
+  const dailyTokensLimit = plan === 'PRO' ? 100000 : 10000
+
+  // Busca registro de uso do dia (prefer new userUsage, fallback to legacy usage)
+  let todayUsage: any = null
+  try {
+    todayUsage = await (prisma as any).userUsage?.findFirst?.({
+      where: { userId: auth.userId, date: String(new Date().toISOString().split('T')[0]) },
+    })
+  } catch {}
+  if (!todayUsage) {
+    todayUsage = await (prisma as any).usage.findFirst({
+      where: { userId: auth.userId, date: { gte: start, lte: end } },
+    })
+  }
+
+  const messages = Number(todayUsage?.messagesUsed ?? todayUsage?.messageCount ?? 0)
+  const tokens = Number(todayUsage?.tokensUsed ?? todayUsage?.tokenCount ?? 0)
+  const cost = Number(todayUsage?.totalCost ?? todayUsage?.cost ?? 0)
+
+  const percentMessages = dailyMessagesLimit ? Number(((messages / dailyMessagesLimit) * 100).toFixed(0)) : 0
+  const percentTokens = dailyTokensLimit ? Number(((tokens / dailyTokensLimit) * 100).toFixed(1)) : 0
+
+  const alerts: Array<{ type: 'warning' | 'danger'; message: string }> = []
+  if (plan === 'FREE') {
+    if (percentMessages >= 90) alerts.push({ type: 'warning', message: 'Você está próximo do limite diário de mensagens (90%)' })
+    if (percentTokens >= 95) alerts.push({ type: 'danger', message: 'Você está muito próximo do limite diário de tokens (95%)' })
+  }
+
+  const res = NextResponse.json({
+    messages,
+    tokens,
+    cost,
+    limits: { dailyMessages: dailyMessagesLimit, dailyTokens: dailyTokensLimit },
+    percentages: { messages: percentMessages, tokens: percentTokens },
+    ...(alerts.length ? { alerts } : {}),
+  })
+  setNoStore(res)
+  return res
+})

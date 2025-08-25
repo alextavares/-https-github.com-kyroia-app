@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import { z } from 'zod'
+
+const RegisterSchema = z.object({
+  name: z.string().min(1, 'Nome é obrigatório'),
+  email: z.string().email('Formato de e-mail inválido'),
+  password: z.string().regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/, 
+    'A senha deve ter pelo menos 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial'
+  ),
+})
 
 export async function POST(request: NextRequest) {
   console.log("=== REGISTER API CALLED ===")
@@ -9,15 +19,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log("Request body:", { ...body, password: "[HIDDEN]" })
     
-    const { name, email, password } = body
-
-    // Validar dados
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { message: "Nome, email e senha são obrigatórios" },
-        { status: 400 }
-      )
+    const parsed = RegisterSchema.safeParse(body)
+    if (!parsed.success) {
+      const msg = parsed.error.errors?.[0]?.message || 'Dados inválidos'
+      return NextResponse.json({ message: msg }, { status: 400 })
     }
+    const { name, email, password } = parsed.data
 
     // Verificar se usuário já existe
     console.log("Checking if user exists with email:", email)
@@ -27,24 +34,23 @@ export async function POST(request: NextRequest) {
     console.log("Existing user check result:", existingUser ? "User exists" : "User not found")
 
     if (existingUser) {
+      // Normalizar tempo para mitigar enumeração por tempo (hash dummy)
+      await bcrypt.hash(password, 10)
       return NextResponse.json(
-        { message: "Usuário já existe com este email" },
+        { message: "E-mail já cadastrado" },
         { status: 400 }
       )
     }
 
     // Hash da senha
-    const passwordHash = await bcrypt.hash(password, 12)
+    const passwordHash = await bcrypt.hash(password, 10)
 
     // Criar usuário
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        // Nosso schema usa 'password' (String?) e 'creditBalance' (Int) em vez de 'passwordHash'/'credits'
         password: passwordHash,
-        planType: "FREE", // Plano inicial gratuito
-        onboardingCompleted: true,
       }
     })
 
@@ -53,7 +59,7 @@ export async function POST(request: NextRequest) {
     const { password: _ignored, ...userWithoutPassword } = user
 
     return NextResponse.json(
-      { message: "Usuário criado com sucesso", user: userWithoutPassword },
+      { message: "Usuário registrado com sucesso", user: userWithoutPassword },
       { status: 201 }
     )
   } catch (error) {
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { message: "Erro interno do servidor", error: error instanceof Error ? error.message : "Unknown error" },
+      { message: "Erro ao registrar usuário" },
       { status: 500 }
     )
   }

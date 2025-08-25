@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  binaryTargets = ["windows"]
 }
 
 datasource db {
@@ -26,6 +26,8 @@ model User {
   subscriptions        Subscription[]
   creditTransactions   CreditTransaction[]
   payments             Payment[]
+  templates            PromptTemplate[]
+  templateFavorites    TemplateFavorite[]
 
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
@@ -68,6 +70,8 @@ model Conversation {
   title      String?
   modelUsed  String?
   isArchived Boolean   @default(false)
+  isPinned   Boolean   @default(false)
+  isFavorite Boolean   @default(false)
   messages   Message[]
 
   createdAt  DateTime  @default(now())
@@ -75,6 +79,7 @@ model Conversation {
 
   @@index([userId, createdAt])
   @@index([userId, isArchived])
+  @@index([userId, isPinned])
 }
 
 model Message {
@@ -131,4 +136,41 @@ model CreditPackage {
   currency  String
   planType  String?
   createdAt DateTime @default(now())
+}
+
+// Prompt templates used in chat/dashboard
+model PromptTemplate {
+  id               String   @id @default(cuid())
+  name             String
+  description      String?
+  category         String?
+  templateContent  String
+  // Stored as JSON string for compatibility with existing API
+  variables        String?
+  tags             String?
+  isPublic         Boolean  @default(true)
+  usageCount       Int      @default(0)
+
+  createdBy        String
+  creator          User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  favorites        TemplateFavorite[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([category, isPublic, createdAt])
+  @@index([createdBy, createdAt])
+}
+
+model TemplateFavorite {
+  id         String          @id @default(cuid())
+  userId     String
+  templateId String
+  createdAt  DateTime        @default(now())
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template   PromptTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, templateId])
+  @@index([userId, createdAt])
 }

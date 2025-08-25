@@ -62,11 +62,11 @@ export function PlanStatusCard() {
   const showLow = credits.isLowBalance === true
 
   return (
-    <Card className="border-border/50">
+    <Card className="border-border/60 bg-black/30">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">Status do Plano</CardTitle>
-          <Badge variant="outline" className="border-border/50">
+          <Badge variant="outline" className="border-border/60">
             {plan.type || 'FREE'}
           </Badge>
         </div>
@@ -77,7 +77,7 @@ export function PlanStatusCard() {
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-sm">
           <span>Créditos</span>
-          <span className={`${showLow ? 'text-yellow-400' : 'text-foreground'}`}>
+          <span className={`${showLow ? 'text-yellow-300' : 'text-foreground'}`}>
             {credits.balance.toLocaleString('pt-BR')} {credits.currency}
           </span>
         </div>
@@ -89,7 +89,7 @@ export function PlanStatusCard() {
         )}
 
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm" className="border-border/50">
+          <Button asChild variant="outline" size="sm" className="border-border/60">
             <Link href={showLow && recommendations && recommendations[0] ? `/dashboard/credits/purchase#${encodeURIComponent(recommendations[0].packageId)}` : "/dashboard/credits/purchase"}>
               Adicionar créditos
             </Link>

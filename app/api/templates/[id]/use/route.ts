@@ -1,39 +1,41 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { NotFound } from '@/lib/http/errors'
 import { requireAuth } from '@/lib/auth/guards'
-import { setNoStore } from '@/lib/cache/headers'
-import { validateWith } from '@/lib/validation/zod-helpers'
+import { prisma } from '@/lib/prisma'
 
-// Padronização: não existe modelo Template no Prisma atual.
-// Este endpoint retorna NotFound de forma consistente, mantendo validação e auth.
+const paramsSchema = z.object({ id: z.string().min(1) })
 
-const paramsSchema = z.object({
-  id: z.string().min(1, 'id é obrigatório'),
-})
-
-const bodySchema = z
-  .object({
-    variables: z.record(z.any()).optional(),
-  })
-  .optional()
-
-export async function POST(req: NextRequest, context: { params: unknown }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireAuth()
-  if (!auth.ok) return auth.error
+  if (!auth.ok) return NextResponse.json({ error: 'Não autorizado' }, { status: auth.error.status })
 
-  const parsedParams = await validateWith(paramsSchema, context?.params ?? {})
-  if (parsedParams instanceof Response) return parsedParams
+  const parsed = paramsSchema.safeParse(params)
+  if (!parsed.success) return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
 
-  let body: unknown = undefined
+  const body = await req.json().catch(() => ({}))
+  const variables: Record<string, string> = body?.variables ?? {}
+
+  const template = await (prisma as any).template.findUnique({ where: { id: parsed.data.id } })
+  if (!template) return NextResponse.json({ error: 'Template não encontrado' }, { status: 404 })
+
+  // Validar variáveis necessárias
+  const requiredVars = Array.from(String(template.content ?? '').matchAll(/\{\{(.*?)\}\}/g)).map((m) => m[1])
+  const missing = requiredVars.filter((v) => !(v in variables))
+  if (missing.length > 0) {
+    return NextResponse.json({ error: `Variáveis faltando: ${missing.join(', ')}` }, { status: 400 })
+  }
+
+  // Render
+  let content = String(template.content ?? '')
+  for (const [k, v] of Object.entries(variables)) {
+    const re = new RegExp(`\\{\\{${k}\\}\\}`, 'g')
+    content = content.replace(re, String(v))
+  }
+
+  // Incrementar uso
   try {
-    if (req.headers.get('content-type')?.includes('application/json')) {
-      body = await req.json()
-    }
+    await (prisma as any).template.update({ where: { id: parsed.data.id }, data: { usageCount: { increment: 1 } } })
   } catch {}
 
-  const parsedBody = await validateWith(bodySchema, body)
-  if (parsedBody instanceof Response) return parsedBody
-
-  return NotFound('Template não disponível neste ambiente')
+  return NextResponse.json({ content })
 }

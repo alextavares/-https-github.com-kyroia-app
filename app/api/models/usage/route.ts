@@ -19,27 +19,31 @@ export async function GET(request: NextRequest) {
     startOfMonth.setDate(1)
     startOfMonth.setHours(0, 0, 0, 0)
 
-    const usage = await prisma.userUsage.groupBy({
-      by: ['modelId'],
+    // Our schema doesn't have a userUsage table; compute from messages
+    const convs = await prisma.conversation.findMany({
+      where: { userId: session.user.id },
+      select: { id: true },
+    })
+    const convIds = convs.map(c => c.id)
+    if (convIds.length === 0) {
+      return NextResponse.json({ usage: [] })
+    }
+
+    const grouped = await prisma.message.groupBy({
+      by: ['modelUsed'],
       where: {
-        userId: session.user.id,
-        date: {
-          gte: startOfMonth,
-        },
+        conversationId: { in: convIds },
+        createdAt: { gte: startOfMonth },
       },
-      _sum: {
-        messagesCount: true,
-        inputTokensUsed: true,
-        outputTokensUsed: true,
-        costIncurred: true,
-      },
+      _count: { _all: true },
+      _sum: { tokensUsed: true },
     })
 
-    const formattedUsage = usage.map(u => ({
-      modelId: u.modelId,
-      messagesCount: u._sum.messagesCount || 0,
-      tokensUsed: (u._sum.inputTokensUsed || 0) + (u._sum.outputTokensUsed || 0),
-      cost: Number(u._sum.costIncurred || 0),
+    const formattedUsage = grouped.map(u => ({
+      modelId: (u as any).modelUsed || 'unknown',
+      messagesCount: (u as any)._count?._all || 0,
+      tokensUsed: Number((u as any)._sum?.tokensUsed || 0),
+      cost: 0,
     }))
 
     return NextResponse.json({ usage: formattedUsage })

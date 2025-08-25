@@ -13,7 +13,6 @@ const publicNavItems = [
 ];
 const dashboardNavItems = [
     { href: '/dashboard/chat', label: 'Chat', icon: MessageSquare, description: 'Conversar com IA' },
-    { href: '/dashboard/templates', label: 'Templates', icon: BookOpen, description: 'Modelos de conversa' },
     { href: '/dashboard/knowledge', label: 'Conhecimento', icon: BookOpen, description: 'Base de conhecimento' },
     { href: '/dashboard/subscription', label: 'Assinatura', icon: CreditCard, description: 'Gerenciar plano' },
     { href: '/dashboard/settings', label: 'Configurações', icon: Settings, description: 'Configurações da conta' },
