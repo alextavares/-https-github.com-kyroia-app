@@ -1,328 +1,173 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { ChevronDown, Sparkles, Zap, Brain, Gauge, Globe, ImageIcon, Video, Mic } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ChevronDown, Zap, Brain, Gauge, Check } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { DropdownTrigger } from "@/components/ui/dropdown-trigger"
 import { cn } from "@/lib/utils"
-import { INNERAI_MODELS, type AIModel as KyroiaModel, getModelsForPlan } from "@/lib/ai/innerai-models-config"
+import { getModelsForPlan, getModelById } from "@/lib/ai/innerai-models-config.ts"
 
-export interface AIModel {
-  id: string
-  name: string
-  provider: string
-  category: 'fast' | 'advanced' | 'reasoning'
-  description: string
-  icon: React.ReactNode
-  badge?: string
-  badgeVariant?: "default" | "secondary" | "destructive" | "outline"
-  speed: "slow" | "medium" | "fast" | "very-fast"
-  intelligence: "basic" | "good" | "advanced" | "state-of-the-art"
-  cost: "$" | "$$" | "$$$" | "$$$$"
-  maxTokens: number
-  features: string[]
-  planRequired: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'
-  isAvailable: boolean
+type Category = 'fast' | 'advanced' | 'reasoning'
+type SimpleModel = { id: string; name: string; provider: string; category: Category; planRequired: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE' }
+
+const CATEGORY_META: Record<Category, { label: string; icon: React.ReactNode }> = {
+  fast: { label: 'Rápidos', icon: <Zap className="h-3.5 w-3.5" /> },
+  advanced: { label: 'Avançados', icon: <Brain className="h-3.5 w-3.5" /> },
+  reasoning: { label: 'Raciocínio', icon: <Gauge className="h-3.5 w-3.5" /> },
 }
 
-// Função para mapear modelos Kyroia para interface local
-const mapKyroiaModel = (model: KyroiaModel): AIModel => {
-  const getIcon = () => {
-    if (model.features.includes('Web Search')) return <Globe className="h-4 w-4" />
-    if (model.category === 'fast') return <Zap className="h-4 w-4" />
-    if (model.category === 'advanced') return <Brain className="h-4 w-4" />
-    if (model.category === 'reasoning') return <Gauge className="h-4 w-4" />
-    return <Sparkles className="h-4 w-4" />
-  }
-
-  const getBadge = () => {
-    if (model.id === 'gpt-4o-mini') return { text: 'Recomendado', variant: 'default' as const }
-    if (model.id === 'claude-3.5-haiku') return { text: 'Mais rápido', variant: 'outline' as const }
-    if (model.id === 'gemini-2.5-flash' || model.id === 'gemini-2-flash-free') return { text: '1M tokens', variant: 'secondary' as const }
-    if (model.id === 'deepseek-r1') return { text: 'Popular', variant: 'secondary' as const }
-    if (model.category === 'reasoning') return { text: 'Raciocínio', variant: 'destructive' as const }
-    if (model.planRequired === 'PRO') return { text: 'PRO', variant: 'default' as const }
-    if (model.planRequired === 'LITE') return { text: 'LITE', variant: 'outline' as const }
-    return null
-  }
-
-  const getCost = (): "$" | "$$" | "$$$" | "$$$$" => {
-    const inputCost = model.costPer1kTokens.input
-    if (inputCost === 0) return "$"
-    if (inputCost < 0.001) return "$"
-    if (inputCost < 0.005) return "$$"
-    if (inputCost < 0.01) return "$$$"
-    return "$$$$"
-  }
-
-  const getSpeed = (): "slow" | "medium" | "fast" | "very-fast" => {
-    if (model.performance.speed === 'fast') return 'very-fast'
-    return model.performance.speed as any
-  }
-
-  const getIntelligence = (): "basic" | "good" | "advanced" | "state-of-the-art" => {
-    if (model.performance.quality === 'superior') return 'state-of-the-art'
-    if (model.performance.quality === 'excellent') return 'advanced'
-    return 'good'
-  }
-
-  const badge = getBadge()
-
-  return {
-    id: model.id,
-    name: model.name,
-    provider: model.provider,
-    category: model.category,
-    description: model.description,
-    icon: getIcon(),
-    badge: badge?.text,
-    badgeVariant: badge?.variant,
-    speed: getSpeed(),
-    intelligence: getIntelligence(),
-    cost: getCost(),
-    maxTokens: model.contextWindow,
-    features: model.features,
-    planRequired: model.planRequired,
-    isAvailable: model.isAvailable
-  }
-}
-
-// Converter e filtrar apenas modelos disponíveis por plano atual (carregado no client)
-function computeModelsForPlan(plan: 'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'): AIModel[] {
+function loadModels(): SimpleModel[] {
   try {
-    return getModelsForPlan(plan)
+    return getModelsForPlan('PRO')
       .filter(m => m.isAvailable)
-      .map(mapKyroiaModel)
+      .map(m => ({ id: m.id, name: m.name, provider: m.provider, category: m.category, planRequired: m.planRequired }))
   } catch {
-    return INNERAI_MODELS.filter(m => m.isAvailable).map(mapKyroiaModel)
+    return []
   }
 }
 
 export function ModelSelector({ compact = false }: { compact?: boolean }) {
+  const [models, setModels] = useState<SimpleModel[]>([])
   const [planType, setPlanType] = useState<'FREE' | 'LITE' | 'PRO' | 'ENTERPRISE'>('FREE')
-  const [models, setModels] = useState<AIModel[]>(computeModelsForPlan('FREE'))
-  const [selectedModel, setSelectedModel] = useState<AIModel>(computeModelsForPlan('FREE')[0])
+  const [selectedId, setSelectedId] = useState<string>('')
+  const [open, setOpen] = useState(false)
 
-  // Load plan + saved model from localStorage
+  // Abrir via evento global (Alt+M)
   useEffect(() => {
-    try {
-      // Query param helper: /dashboard?resetModels=1 -> limpa storage e reseta
-      try {
-        const url = new URL(window.location.href)
-        if (url.searchParams.get('resetModels') === '1') {
-          localStorage.removeItem('selectedModel')
-          ;(['FREE','LITE','PRO','ENTERPRISE'] as const).forEach(p => localStorage.removeItem(`selectedModel:${p}`))
-          localStorage.removeItem('lastPlanType')
-          url.searchParams.delete('resetModels')
-          window.history.replaceState({}, '', url.toString())
-        }
-      } catch {}
-
-      const savedPlan = localStorage.getItem('lastPlanType') as typeof planType | null
-      if (savedPlan === 'FREE' || savedPlan === 'LITE' || savedPlan === 'PRO' || savedPlan === 'ENTERPRISE') {
-        setPlanType(savedPlan)
-        const ms = computeModelsForPlan(savedPlan)
-        setModels(ms)
-        setSelectedModel(ms[0])
+    const onOpen = () => setOpen(true)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('kyroia:model:open', onOpen as any)
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('kyroia:model:open', onOpen as any)
       }
-      // Tentar chave global sem plano primeiro (compatibilidade com ChatInput)
-      const globalSelected = localStorage.getItem('selectedModel')
-      const savedModelId = globalSelected || localStorage.getItem(`selectedModel:${savedPlan ?? 'FREE'}`)
-      if (savedModelId) {
-        const found = computeModelsForPlan(savedPlan ?? 'FREE').find(m => m.id === savedModelId)
-        if (found) setSelectedModel(found)
-      }
-    } catch {}
-    try {
-      const ms = computeModelsForPlan(planType)
-      // eslint-disable-next-line no-console
-      console.info('[ModelSelector] init plan=', planType, 'models=', ms.map(m => m.id))
-    } catch {}
+    }
   }, [])
 
-  // Try loading plan from API
+  useEffect(() => {
+    const ms = loadModels()
+    setModels(ms)
+    let initial = 'gpt-4o-mini'
+    try {
+      const lastPlan = (localStorage.getItem('lastPlanType') as any) || 'FREE'
+      setPlanType(lastPlan)
+      const saved = localStorage.getItem(`selectedModel:${lastPlan}`) || localStorage.getItem('selectedModel')
+      if (saved && ms.some(m => m.id === saved)) initial = saved
+    } catch {}
+    if (!ms.some(m => m.id === initial)) initial = ms[0]?.id || ''
+    setSelectedId(initial)
+  }, [])
+
   useEffect(() => {
     const loadPlan = async () => {
       try {
         const res = await fetch('/api/subscription', { cache: 'no-store' })
         if (res.ok) {
-          const json = await res.json()
-          const pt = (json?.planType || 'FREE') as typeof planType
+          const j = await res.json()
+          const pt = (j?.planType || 'FREE') as typeof planType
           setPlanType(pt)
           localStorage.setItem('lastPlanType', pt)
-          const ms = computeModelsForPlan(pt)
-          setModels(ms)
-          // If current selected not in new set, fallback
-          if (!ms.some(m => m.id === selectedModel.id)) {
-            setSelectedModel(ms[0])
-          }
-          // eslint-disable-next-line no-console
-          console.info('[ModelSelector] api plan=', pt, 'models=', ms.map(m => m.id))
         }
       } catch {}
     }
     loadPlan()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleModelSelect = (model: AIModel) => {
-    setSelectedModel(model)
-    // Salvar nos dois formatos para compatibilidade com outras partes da app
-    localStorage.setItem(`selectedModel:${planType}`, model.id)
-    localStorage.setItem('selectedModel', model.id)
+  const grouped = useMemo(() => {
+    const groups: Record<Category, SimpleModel[]> = { fast: [], advanced: [], reasoning: [] }
+    for (const m of models) groups[m.category].push(m)
+    return groups
+  }, [models])
+
+  const applySelection = (id: string) => {
+    setSelectedId(id)
+    try {
+      const meta = getModelById(id)
+      localStorage.setItem('selectedModel', id)
+      localStorage.setItem(`selectedModel:${planType}`, id)
+      sessionStorage.setItem('modelAppliedName', meta?.name || id)
+    } catch {}
+    setOpen(false)
   }
 
-  const getSpeedIcon = (speed: string) => {
-    switch (speed) {
-      case "very-fast": return "⚡⚡⚡"
-      case "fast": return "⚡⚡"
-      case "medium": return "⚡"
-      default: return "🐌"
-    }
-  }
+  const selected = models.find(m => m.id === selectedId)
+  const selectedName = selected?.name || 'Selecionar modelo'
 
-  const getIntelligenceIcon = (intelligence: string) => {
-    switch (intelligence) {
-      case "state-of-the-art": return "🧠🧠🧠"
-      case "advanced": return "🧠🧠"
-      case "good": return "🧠"
-      default: return "💡"
-    }
-  }
-
-  // Agrupar modelos por categoria - EXATAMENTE como no Kyroia
-  const fastModels = models.filter(m => m.category === 'fast')
-  const advancedModels = models.filter(m => m.category === 'advanced')
-  const reasoningModels = models.filter(m => m.category === 'reasoning')
-
-  const getCategoryLabel = (category: string) => {
-    switch (category) {
-      case 'fast': return '⚡ Modelos Rápidos'
-      case 'advanced': return '🧠 Modelos Avançados'
-      case 'reasoning': return '🎯 Raciocínio Profundo'
-      case 'credit': return '💎 Modelos Premium (Créditos)'
-      default: return category
-    }
-  }
-
-  const renderModelGroup = (modelList: AIModel[], title: string) => (
-    <div key={title}>
-      <DropdownMenuLabel className={cn("text-text-secondary font-semibold", compact ? "text-[11px]" : "text-xs") }>
-        {title}
-      </DropdownMenuLabel>
-      {modelList.map((model) => (
-        <DropdownMenuItem
-          key={model.id}
-          onSelect={() => handleModelSelect(model)}
-          className={cn(
-            "flex flex-col items-start cursor-pointer transition-all duration-200",
-            compact ? "space-y-1.5 p-2" : "space-y-2 p-3",
-            "hover:bg-surface hover:shadow-soft rounded-md mx-1",
-            selectedModel.id === model.id && "bg-primary/10 border-l-2 border-primary"
+  const renderItem = (m: SimpleModel) => (
+    <DropdownMenuItem
+      key={m.id}
+      onSelect={() => applySelection(m.id)}
+      className={cn(
+        'flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer',
+        m.id === selectedId && 'bg-primary/10'
+      )}
+    >
+      <span className="text-muted-foreground/70">
+        {m.category === 'fast' ? <Zap className="h-3.5 w-3.5" /> : m.category === 'advanced' ? <Brain className="h-3.5 w-3.5" /> : <Gauge className="h-3.5 w-3.5" />}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium truncate max-w-[240px]">{m.name}</span>
+          {m.planRequired !== 'FREE' && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-border text-muted-foreground">PRO</span>
           )}
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center space-x-2">
-              <div className="text-primary">{model.icon}</div>
-              <div className="flex flex-col">
-                <span className={cn("font-medium text-text-primary", compact ? "text-[13px]" : undefined)}>{model.name}</span>
-                <span className="text-xs text-text-tertiary">{model.provider}</span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-1">
-              {model.badge && (
-                <Badge 
-                  variant={model.badgeVariant} 
-                  className="ml-2 text-xs bg-primary/10 text-primary border-primary/20"
-                >
-                  {model.badge}
-                </Badge>
-              )}
-              {model.planRequired === 'PRO' && (
-                <Badge variant="outline" className="text-xs border-accent text-accent">
-                  PRO
-                </Badge>
-              )}
-            </div>
-          </div>
-          
-          <p className="text-xs text-text-secondary leading-relaxed">{model.description}</p>
-          
-          <div className="flex items-center justify-between w-full text-xs">
-            <div className="flex items-center space-x-3">
-              <span title="Velocidade" className="flex items-center space-x-1">
-                <span>{getSpeedIcon(model.speed)}</span>
-              </span>
-              <span title="Inteligência" className="flex items-center space-x-1">
-                <span>{getIntelligenceIcon(model.intelligence)}</span>
-              </span>
-              <span title="Custo" className="font-mono text-text-secondary">{model.cost}</span>
-            </div>
-            <div className="flex items-center space-x-2 text-text-tertiary">
-              <span className="text-xs">
-                {model.maxTokens >= 1000000 
-                  ? `${(model.maxTokens / 1000000).toFixed(1)}M`
-                  : model.maxTokens >= 1000 
-                  ? `${(model.maxTokens / 1000).toFixed(0)}K`
-                  : `${model.maxTokens}`
-                } tokens
-              </span>
-              {model.features.includes('Vision') && <span title="Suporta imagens">🖼️</span>}
-              {model.features.includes('Function Calling') && <span title="Suporta ferramentas">🔧</span>}
-              {model.planRequired !== 'FREE' && <span title="Consome créditos">💳</span>}
-            </div>
-          </div>
-        </DropdownMenuItem>
-      ))}
-      <DropdownMenuSeparator className="my-2" />
-    </div>
+        </div>
+        <div className="text-[11px] text-text-tertiary truncate">{m.provider}</div>
+      </div>
+      {m.id === selectedId && <Check className="h-4 w-4 text-primary" />}
+    </DropdownMenuItem>
   )
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button 
+        <DropdownTrigger
           data-testid="model-selector-trigger"
-          variant="outline" 
           className={cn(
-            "w-auto justify-between bg-card hover:bg-card-hover border-border hover:border-primary/50 shadow-soft hover:shadow-soft-md text-text-primary transition-all duration-300 shrink-0",
-            compact ? "min-w-[200px] md:min-w-[240px] h-8 px-3" : "min-w-[240px] md:min-w-[280px] h-9 px-4"
+            'rounded-full border border-border/60 bg-card/80 hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-soft hover:shadow-soft-md',
+            compact ? 'h-9 px-3 min-w-[220px]' : 'h-10 px-4 min-w-[260px]'
           )}
         >
-          <div className={cn("flex items-center", compact ? "gap-2" : "gap-3") }>
-            <div className="text-primary">{selectedModel.icon}</div>
-            <div className="flex flex-col items-start leading-tight">
-              <span className={cn("font-medium", compact ? "text-sm" : undefined)}>{selectedModel.name}</span>
-              <span className={cn("text-text-secondary", compact ? "text-[11px]" : "text-xs")}>{selectedModel.provider}</span>
+          <div className={cn('flex items-center', compact ? 'gap-2' : 'gap-3')}>
+            <span className="text-muted-foreground/80">
+              {selected?.category === 'fast' ? <Zap className="h-4 w-4" /> : selected?.category === 'advanced' ? <Brain className="h-4 w-4" /> : <Gauge className="h-4 w-4" />}
+            </span>
+            <div className={cn('leading-tight', compact ? 'flex items-center gap-2' : 'flex flex-col items-start')}>
+              <span className={cn('font-medium truncate', compact ? 'text-sm max-w-[160px]' : 'max-w-[200px]')}>{selectedName}</span>
+              {!compact && (
+                <span className="text-[11px] text-text-tertiary">
+                  {selected?.provider || '—'} {selected && selected.planRequired !== 'FREE' ? '· 💳' : ''}
+                </span>
+              )}
             </div>
           </div>
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
-        </Button>
+        </DropdownTrigger>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className={cn("bg-card border-border shadow-soft-lg rounded-xl", compact ? "w-[400px] md:w-[440px]" : "w-[480px] md:w-[520px]") }>
-        <div className={cn(compact ? "p-2" : "p-3") }>
-          <DropdownMenuLabel className={cn("text-text-primary font-semibold", compact ? "text-sm" : "text-base") }>
-            🤖 Selecione um Modelo de IA
-          </DropdownMenuLabel>
-          <p className={cn("text-text-secondary", compact ? "text-[11px] mt-0.5 mb-2" : "text-xs mt-1 mb-3") }>
-            Escolha o modelo ideal para sua tarefa
-          </p>
-          <DropdownMenuSeparator className="bg-border" />
+      <DropdownMenuContent align="start" className={cn('bg-card/95 backdrop-blur border border-border shadow-soft-lg rounded-xl', compact ? 'w-[420px]' : 'w-[500px]') }>
+        <div className={cn(compact ? 'p-2' : 'p-3')}>
+          <DropdownMenuLabel className={cn('text-text-primary font-semibold', compact ? 'text-sm' : 'text-base')}>Selecione um modelo</DropdownMenuLabel>
+          <p className={cn('text-text-secondary', compact ? 'text-[11px] mt-0.5 mb-2' : 'text-xs mt-1 mb-3')}>Escolha um modelo de IA para sua conversa</p>
         </div>
-        <div className={cn("overflow-y-auto", compact ? "max-h-72" : "max-h-96") }>
-          {fastModels.length > 0 && renderModelGroup(fastModels, getCategoryLabel('fast'))}
-          {advancedModels.length > 0 && renderModelGroup(advancedModels, getCategoryLabel('advanced'))}
-          {reasoningModels.length > 0 && renderModelGroup(reasoningModels, getCategoryLabel('reasoning'))}
+        {(['fast','advanced','reasoning'] as Category[]).map(cat => (
+          grouped[cat].length > 0 ? (
+            <div key={cat} className="px-2">
+              <div className="flex items-center gap-2 px-1 py-1.5 text-xs text-text-secondary">
+                {CATEGORY_META[cat].icon}
+                <span className="font-semibold">{CATEGORY_META[cat].label}</span>
+                <div className="ml-2 h-px flex-1 bg-border/80" />
+              </div>
+              {grouped[cat].map(renderItem)}
+              <DropdownMenuSeparator className="my-2" />
+            </div>
+          ) : null
+        ))}
+        <div className={cn(compact ? 'px-2 pb-2' : 'px-3 pb-3', 'text-right text-[11px]')}>
+          <a href="/dashboard/models" className="underline text-muted-foreground hover:text-foreground">Ver todos os modelos</a>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
+
