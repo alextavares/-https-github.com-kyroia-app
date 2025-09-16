@@ -114,3 +114,20 @@ gh_2.40.1_linux_amd64/
 
 # Package lock (usar npm ci)
 package-lock.json
+
+# MCP automation artifacts
+/_archive_nonessential_*/
+external-captures/
+screenshots-puppeteer/
+test-results/
+imgs/
+imgs-*/
+imgs-modulo-ai sheets/
+imgs-modulo-documentos-ia/
+imgs-modulo-slides/
+imagens/
+scripts/tmp-*.js
+scripts/tmp-*.ts
+scripts/fixtures/
+write_here_ok
+
